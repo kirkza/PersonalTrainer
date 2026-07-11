@@ -1,0 +1,182 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { updateSettings } from "@/lib/actions";
+import type { Experience, Goal, Profile, Units } from "@/lib/types";
+
+const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+export default function SettingsForm({
+  profile,
+  allEquipment,
+  logout,
+}: {
+  profile: Profile;
+  allEquipment: string[];
+  logout: () => Promise<void>;
+}) {
+  const router = useRouter();
+  const [goal, setGoal] = useState<Goal>(profile.goal);
+  const [experience, setExperience] = useState<Experience>(profile.experience);
+  const [weekdays, setWeekdays] = useState<number[]>(profile.weekdays);
+  const [sessionMinutes, setSessionMinutes] = useState(profile.sessionMinutes);
+  const [equipment, setEquipment] = useState<string[]>(profile.equipment);
+  const [units, setUnits] = useState<Units>(profile.units);
+  const [saved, setSaved] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  const save = (regenerate: boolean) => {
+    const next: Profile = {
+      goal,
+      experience,
+      daysPerWeek: weekdays.length,
+      weekdays,
+      sessionMinutes,
+      equipment,
+      units,
+    };
+    startTransition(async () => {
+      await updateSettings(next, regenerate);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+      router.refresh();
+    });
+  };
+
+  const chip = (active: boolean) =>
+    `rounded-full border px-3 py-1.5 text-sm capitalize ${
+      active
+        ? "border-accent bg-accent/15 text-accent"
+        : "border-border-subtle bg-surface text-muted"
+    }`;
+
+  return (
+    <main className="flex flex-col gap-5">
+      <h1 className="text-xl font-bold">Settings</h1>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-muted">Goal</h2>
+        <div className="flex flex-wrap gap-2">
+          {(["strength", "hypertrophy", "general"] as Goal[]).map((g) => (
+            <button key={g} onClick={() => setGoal(g)} className={chip(goal === g)}>
+              {g}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-muted">Experience</h2>
+        <div className="flex flex-wrap gap-2">
+          {(["beginner", "intermediate", "advanced"] as Experience[]).map((e) => (
+            <button
+              key={e}
+              onClick={() => setExperience(e)}
+              className={chip(experience === e)}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-muted">Training days</h2>
+        <div className="grid grid-cols-7 gap-1.5">
+          {WEEKDAY_LABELS.map((d, i) => (
+            <button
+              key={d}
+              onClick={() =>
+                setWeekdays((w) =>
+                  w.includes(i) ? w.filter((x) => x !== i) : [...w, i].sort()
+                )
+              }
+              className={`rounded-lg border py-2.5 text-xs font-medium ${
+                weekdays.includes(i)
+                  ? "border-accent bg-accent/15 text-accent"
+                  : "border-border-subtle bg-surface text-muted"
+              }`}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-muted">Session length</h2>
+        <div className="flex flex-wrap gap-2">
+          {[30, 45, 60, 75, 90].map((m) => (
+            <button
+              key={m}
+              onClick={() => setSessionMinutes(m)}
+              className={chip(sessionMinutes === m)}
+            >
+              {m} min
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-muted">My gym&apos;s equipment</h2>
+        <div className="flex flex-wrap gap-2">
+          {allEquipment.map((g) => (
+            <button
+              key={g}
+              onClick={() =>
+                setEquipment((eq) =>
+                  eq.includes(g) ? eq.filter((x) => x !== g) : [...eq, g]
+                )
+              }
+              className={chip(equipment.includes(g))}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-muted">Units</h2>
+        <div className="flex gap-2">
+          {(["kg", "lb"] as Units[]).map((u) => (
+            <button key={u} onClick={() => setUnits(u)} className={chip(units === u)}>
+              {u}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <div className="flex flex-col gap-2 pt-2">
+        {saved && (
+          <p className="text-center text-sm text-accent">Saved ✓</p>
+        )}
+        <button
+          disabled={pending || weekdays.length < 2 || equipment.length === 0}
+          onClick={() => save(false)}
+          className="rounded-xl border border-border-subtle bg-surface py-3 font-medium disabled:opacity-40"
+        >
+          Save (keep current plan)
+        </button>
+        <button
+          disabled={pending || weekdays.length < 2 || equipment.length === 0}
+          onClick={() => {
+            if (window.confirm("Save and build a fresh plan from these settings?"))
+              save(true);
+          }}
+          className="rounded-xl bg-accent-strong py-3 font-semibold text-black disabled:opacity-40"
+        >
+          Save &amp; regenerate plan
+        </button>
+        <button
+          onClick={() => startTransition(() => logout())}
+          className="py-2 text-center text-sm text-danger"
+        >
+          Log out
+        </button>
+      </div>
+    </main>
+  );
+}

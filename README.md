@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Personal Fitness Trainer
 
-## Getting Started
+A single-user, mobile-first personal trainer web app. It generates a weekly
+training plan from your goal, schedule, and your gym's actual equipment — then
+adapts when life happens:
 
-First, run the development server:
+- **⇄ Swap** any exercise for an alternative that hits the same muscle
+  ("just today" when the machine is busy, or "always" when your gym doesn't have it)
+- **⏱ Short on time** — start a 45- or 30-minute compressed version that keeps
+  the key lifts and trims accessories
+- **Missed a day?** Shift your week, fold the key lifts into your next session,
+  or just skip it
+
+Workouts are logged set-by-set (prefilled from last time) and feed a progress
+dashboard with weekly volume, per-muscle volume, PRs, and streaks.
+
+Built on the [exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset)
+(1,324 exercises with instructions and demonstration GIFs — media © Gym visual).
+
+## Stack
+
+Next.js (App Router) · TypeScript · Tailwind CSS · Drizzle ORM ·
+Neon Postgres in production / embedded PGlite in local dev · Recharts · Vitest
+
+## Local development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+No database setup needed locally — with `DATABASE_URL` unset, the app uses an
+embedded Postgres (PGlite) stored in `.pglite/`. Configure `.env.local`:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+APP_PIN=1234              # your login PIN
+AUTH_SECRET=<any long random string>
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Tests: `npx vitest run` (plan generator, session compression, week reshuffle).
 
-## Learn More
+## Deploy (Vercel + Neon)
 
-To learn more about Next.js, take a look at the following resources:
+1. Push this repo to GitHub and import it in [Vercel](https://vercel.com/new).
+2. In the Vercel project: Storage → **Create database → Neon Postgres**
+   (this sets `DATABASE_URL` automatically), or set `DATABASE_URL` manually.
+3. Add env vars: `APP_PIN` (your PIN) and `AUTH_SECRET` (long random string).
+4. Apply the schema once: `DATABASE_URL=<neon url> npx drizzle-kit push`
+   from your machine.
+5. Deploy. Open the URL on your phone, log in, and complete onboarding.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Data & attribution
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Exercise data is bundled at `src/data/exercises.slim.json` (English-only slice
+of the full dataset — regenerate with `scripts/slim-dataset.mjs`). Images and
+GIFs are loaded from the upstream GitHub repository at runtime.
+Exercise media © Gym visual, used with attribution per the dataset's NOTICE.
