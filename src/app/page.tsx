@@ -81,10 +81,15 @@ export default async function TodayPage() {
                       {pe.role === "primary" && (
                         <span className="mr-1 text-accent">★</span>
                       )}
+                      {pe.role === "cardio" && (
+                        <span className="mr-1 text-accent">♥</span>
+                      )}
                       {ex.name}
                     </span>
                     <span className="shrink-0 pl-2 text-muted">
-                      {pe.sets}×{pe.repsLow}–{pe.repsHigh}
+                      {pe.role === "cardio"
+                        ? `${pe.minutes ?? 10} min`
+                        : `${pe.sets}×${pe.repsLow}–${pe.repsHigh}`}
                     </span>
                   </li>
                 );

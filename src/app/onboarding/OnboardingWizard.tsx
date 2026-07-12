@@ -50,6 +50,8 @@ export default function OnboardingWizard({
   const [experience, setExperience] = useState<Experience>("beginner");
   const [weekdays, setWeekdays] = useState<number[]>([0, 2, 4]);
   const [sessionMinutes, setSessionMinutes] = useState(60);
+  const [cardioFinisher, setCardioFinisher] = useState(false);
+  const [cardioDay, setCardioDay] = useState(false);
   const [equipment, setEquipment] = useState<string[]>(DEFAULT_GYM);
   const [showAllGear, setShowAllGear] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -71,6 +73,8 @@ export default function OnboardingWizard({
       sessionMinutes,
       equipment,
       units: "kg",
+      cardioFinisher,
+      cardioDay: cardioDay && weekdays.length >= 3,
     };
     startTransition(() => completeOnboarding(profile));
   };
@@ -171,7 +175,57 @@ export default function OnboardingWizard({
         </button>
       ))}
     </div>,
-    // 4: equipment
+    // 4: cardio
+    <div key="cardio" className="flex flex-col gap-3">
+      <h2 className="text-lg font-semibold">Add cardio?</h2>
+      <p className="text-sm text-muted">
+        Optional — good for your heart and recovery. Both are tracked in the
+        app.
+      </p>
+      <button
+        onClick={() => setCardioFinisher((v) => !v)}
+        className={`rounded-xl border p-4 text-left ${
+          cardioFinisher
+            ? "border-accent bg-surface-2"
+            : "border-border-subtle bg-surface"
+        }`}
+      >
+        <div className="font-medium">
+          {cardioFinisher ? "✓ " : ""}Finisher after lifting
+        </div>
+        <div className="text-sm text-muted">
+          ~10 min of cardio at the end of each session (inside your time
+          budget)
+        </div>
+      </button>
+      <button
+        onClick={() => weekdays.length >= 3 && setCardioDay((v) => !v)}
+        disabled={weekdays.length < 3}
+        className={`rounded-xl border p-4 text-left disabled:opacity-40 ${
+          cardioDay && weekdays.length >= 3
+            ? "border-accent bg-surface-2"
+            : "border-border-subtle bg-surface"
+        }`}
+      >
+        <div className="font-medium">
+          {cardioDay && weekdays.length >= 3 ? "✓ " : ""}Dedicated cardio day
+        </div>
+        <div className="text-sm text-muted">
+          {weekdays.length < 3
+            ? "Needs at least 3 training days"
+            : "One of your training days becomes a cardio session"}
+        </div>
+      </button>
+      <button
+        onClick={() => setStep(5)}
+        className="mt-2 rounded-xl bg-accent-strong py-3 font-semibold text-black"
+      >
+        {cardioFinisher || (cardioDay && weekdays.length >= 3)
+          ? "Continue"
+          : "Skip cardio"}
+      </button>
+    </div>,
+    // 5: equipment
     <div key="gear" className="flex flex-col gap-3">
       <h2 className="text-lg font-semibold">What does your gym have?</h2>
       <p className="text-sm text-muted">
@@ -215,12 +269,12 @@ export default function OnboardingWizard({
       <div>
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">Let&apos;s set you up</h1>
-          <span className="text-sm text-muted">{step + 1}/5</span>
+          <span className="text-sm text-muted">{step + 1}/6</span>
         </div>
         <div className="mt-2 h-1 overflow-hidden rounded bg-surface-2">
           <div
             className="h-full bg-accent transition-all"
-            style={{ width: `${((step + 1) / 5) * 100}%` }}
+            style={{ width: `${((step + 1) / 6) * 100}%` }}
           />
         </div>
       </div>

@@ -11,6 +11,10 @@ export interface Profile {
   sessionMinutes: number;
   equipment: string[];
   units: Units;
+  /** ~10 min of cardio appended to each lifting session */
+  cardioFinisher: boolean;
+  /** one training day becomes a dedicated cardio session (needs ≥3 days) */
+  cardioDay: boolean;
 }
 
 /** One prescribed exercise inside a plan day or workout snapshot. */
@@ -19,8 +23,11 @@ export interface PlanExercise {
   sets: number;
   repsLow: number;
   repsHigh: number;
-  /** primaries survive time compression; accessories get trimmed first */
-  role: "primary" | "accessory";
+  /** primaries survive time compression; accessories get trimmed first,
+   *  cardio finishers are dropped before accessories */
+  role: "primary" | "accessory" | "cardio";
+  /** cardio only: target duration — logged in minutes instead of reps×weight */
+  minutes?: number;
 }
 
 export interface GeneratedDay {

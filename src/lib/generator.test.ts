@@ -12,6 +12,8 @@ const base: Profile = {
   sessionMinutes: 60,
   equipment: ["barbell", "dumbbell", "cable", "leverage machine", "body weight"],
   units: "kg",
+  cardioFinisher: false,
+  cardioDay: false,
 };
 
 describe("generatePlan", () => {
@@ -85,5 +87,43 @@ describe("generatePlan", () => {
     const a = generatePlan(base, exercises, 99);
     const b = generatePlan(base, exercises, 99);
     expect(a).toEqual(b);
+  });
+
+  it("appends a ~10 min cardio finisher that still fits the budget", () => {
+    const plan = generatePlan({ ...base, cardioFinisher: true }, exercises, 5);
+    for (const day of plan) {
+      const last = day.exercises.at(-1)!;
+      expect(last.role).toBe("cardio");
+      expect(last.minutes).toBe(10);
+      expect(estimateMinutes(day.exercises)).toBeLessThanOrEqual(
+        base.sessionMinutes
+      );
+    }
+  });
+
+  it("adds a dedicated cardio day in place of one lifting day", () => {
+    const plan = generatePlan({ ...base, cardioDay: true }, exercises, 5);
+    expect(plan).toHaveLength(4);
+    expect(plan.slice(0, 3).map((d) => d.focus)).toEqual([
+      "Full Body A",
+      "Full Body B",
+      "Full Body C",
+    ]);
+    const cardio = plan[3];
+    expect(cardio.focus).toBe("Cardio");
+    expect(cardio.exercises.length).toBeGreaterThan(0);
+    for (const e of cardio.exercises) {
+      expect(e.role).toBe("cardio");
+      expect(e.minutes).toBeGreaterThanOrEqual(5);
+    }
+  });
+
+  it("skips the cardio day when training fewer than 3 days", () => {
+    const plan = generatePlan(
+      { ...base, daysPerWeek: 2, cardioDay: true },
+      exercises,
+      5
+    );
+    expect(plan.map((d) => d.focus)).toEqual(["Full Body A", "Full Body B"]);
   });
 });

@@ -18,6 +18,8 @@ export async function getProfile(): Promise<(Profile & { id: number }) | null> {
     sessionMinutes: r.sessionMinutes,
     equipment: r.equipment,
     units: r.units as Profile["units"],
+    cardioFinisher: r.cardioFinisher,
+    cardioDay: r.cardioDay,
   };
 }
 
@@ -124,6 +126,7 @@ export interface SetRow {
   setNumber: number;
   reps: number;
   weight: number;
+  durationMin: number | null;
 }
 
 export async function getSetsForWorkout(workoutId: number): Promise<SetRow[]> {
@@ -149,14 +152,22 @@ export interface SessionExerciseView {
   repsLow: number;
   repsHigh: number;
   role: PlanExercise["role"];
-  logged: { id: number; setNumber: number; reps: number; weight: number }[];
-  lastTime: { reps: number; weight: number }[];
+  /** cardio only: target duration in minutes */
+  minutes: number | null;
+  logged: {
+    id: number;
+    setNumber: number;
+    reps: number;
+    weight: number;
+    durationMin: number | null;
+  }[];
+  lastTime: { reps: number; weight: number; durationMin: number | null }[];
 }
 
 export function toExerciseView(
   pe: PlanExercise,
   logged: SetRow[],
-  lastTime: { reps: number; weight: number }[]
+  lastTime: { reps: number; weight: number; durationMin: number | null }[]
 ): SessionExerciseView | null {
   const ex = getExercise(pe.exerciseId);
   if (!ex) return null;
@@ -172,6 +183,7 @@ export function toExerciseView(
     repsLow: pe.repsLow,
     repsHigh: pe.repsHigh,
     role: pe.role,
+    minutes: pe.minutes ?? null,
     logged: logged
       .filter((s) => s.exerciseId === pe.exerciseId)
       .map((s) => ({
@@ -179,6 +191,7 @@ export function toExerciseView(
         setNumber: s.setNumber,
         reps: s.reps,
         weight: s.weight,
+        durationMin: s.durationMin,
       })),
     lastTime,
   };
@@ -187,9 +200,14 @@ export function toExerciseView(
 /** Most recent completed workout's sets for an exercise (for prefill). */
 export async function lastSetsFor(
   exerciseIds: string[]
-): Promise<Map<string, { reps: number; weight: number }[]>> {
+): Promise<
+  Map<string, { reps: number; weight: number; durationMin: number | null }[]>
+> {
   const db = await getDb();
-  const result = new Map<string, { reps: number; weight: number }[]>();
+  const result = new Map<
+    string,
+    { reps: number; weight: number; durationMin: number | null }[]
+  >();
   if (exerciseIds.length === 0) return result;
 
   const completed = await db
@@ -213,7 +231,11 @@ export async function lastSetsFor(
       if (mine.length > 0) {
         result.set(
           id,
-          mine.map((s) => ({ reps: s.reps, weight: s.weight }))
+          mine.map((s) => ({
+            reps: s.reps,
+            weight: s.weight,
+            durationMin: s.durationMin,
+          }))
         );
       }
     }

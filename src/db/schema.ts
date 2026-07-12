@@ -19,6 +19,8 @@ export const profile = pgTable("profile", {
   sessionMinutes: integer("session_minutes").notNull(),
   equipment: jsonb("equipment").$type<string[]>().notNull(),
   units: text("units").notNull().default("kg"),
+  cardioFinisher: boolean("cardio_finisher").notNull().default(false),
+  cardioDay: boolean("cardio_day").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -67,5 +69,7 @@ export const sets = pgTable("sets", {
   setNumber: integer("set_number").notNull(),
   reps: integer("reps").notNull(),
   weight: real("weight").notNull().default(0),
+  /** cardio sets: duration logged instead of reps×weight */
+  durationMin: integer("duration_min"),
   loggedAt: timestamp("logged_at", { withTimezone: true }).notNull().defaultNow(),
 });

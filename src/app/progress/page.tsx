@@ -67,6 +67,7 @@ export default async function ProgressPage() {
     byMuscle.set(ex.bodyPart, (byMuscle.get(ex.bodyPart) ?? 0) + vol);
   }
   const muscleRows = [...byMuscle.entries()]
+    .filter(([, vol]) => vol > 0)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8);
   const maxMuscle = muscleRows[0]?.[1] ?? 1;
@@ -94,6 +95,14 @@ export default async function ProgressPage() {
     .sort((a, b) => b[1].volume - a[1].volume)
     .slice(0, 6);
 
+  // ----- cardio minutes this week -----
+  const cardioThisWeek = sets.reduce((sum, s) => {
+    const w = workoutById.get(s.workoutId);
+    if (!w || s.durationMin === null) return sum;
+    const t = (w.finishedAt ?? w.startedAt).getTime();
+    return t >= thisMonday.getTime() ? sum + s.durationMin : sum;
+  }, 0);
+
   // ----- streak: consecutive weeks with a completed workout -----
   const weeksWithWork = new Set(
     completed.map((w) =>
@@ -114,7 +123,7 @@ export default async function ProgressPage() {
     <main className="flex flex-col gap-5">
       <h1 className="text-xl font-bold">Progress</h1>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <div className="rounded-xl border border-border-subtle bg-surface p-3 text-center">
           <div className="text-2xl font-bold text-accent">{streak}</div>
           <div className="text-[11px] text-muted">week streak</div>
@@ -128,6 +137,10 @@ export default async function ProgressPage() {
             {weekly.at(-1)?.volume.toLocaleString() ?? 0}
           </div>
           <div className="text-[11px] text-muted">{units} this week</div>
+        </div>
+        <div className="rounded-xl border border-border-subtle bg-surface p-3 text-center">
+          <div className="text-2xl font-bold">{cardioThisWeek}</div>
+          <div className="text-[11px] text-muted">cardio min this week</div>
         </div>
       </div>
 

@@ -126,12 +126,20 @@ export async function logSet(
   exerciseId: string,
   setNumber: number,
   reps: number,
-  weight: number
+  weight: number,
+  durationMin?: number
 ) {
   const db = await getDb();
   const [row] = await db
     .insert(schema.sets)
-    .values({ workoutId, exerciseId, setNumber, reps, weight })
+    .values({
+      workoutId,
+      exerciseId,
+      setNumber,
+      reps,
+      weight,
+      durationMin: durationMin ?? null,
+    })
     .returning();
   return { id: row.id };
 }

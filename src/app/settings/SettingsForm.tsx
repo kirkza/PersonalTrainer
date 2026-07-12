@@ -23,6 +23,8 @@ export default function SettingsForm({
   const [sessionMinutes, setSessionMinutes] = useState(profile.sessionMinutes);
   const [equipment, setEquipment] = useState<string[]>(profile.equipment);
   const [units, setUnits] = useState<Units>(profile.units);
+  const [cardioFinisher, setCardioFinisher] = useState(profile.cardioFinisher);
+  const [cardioDay, setCardioDay] = useState(profile.cardioDay);
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -35,6 +37,8 @@ export default function SettingsForm({
       sessionMinutes,
       equipment,
       units,
+      cardioFinisher,
+      cardioDay: cardioDay && weekdays.length >= 3,
     };
     startTransition(async () => {
       await updateSettings(next, regenerate);
@@ -136,6 +140,30 @@ export default function SettingsForm({
             </button>
           ))}
         </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-muted">Cardio</h2>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setCardioFinisher((v) => !v)}
+            className={chip(cardioFinisher)}
+          >
+            finisher after lifting
+          </button>
+          <button
+            onClick={() => weekdays.length >= 3 && setCardioDay((v) => !v)}
+            disabled={weekdays.length < 3}
+            className={`${chip(cardioDay && weekdays.length >= 3)} disabled:opacity-40`}
+          >
+            dedicated cardio day
+          </button>
+        </div>
+        {weekdays.length < 3 && (
+          <p className="text-xs text-muted">
+            A dedicated cardio day needs at least 3 training days.
+          </p>
+        )}
       </section>
 
       <section className="flex flex-col gap-2">

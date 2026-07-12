@@ -21,6 +21,15 @@ const pe = (
   role,
 });
 
+const cardio = (id: string, minutes: number): PlanExercise => ({
+  exerciseId: id,
+  sets: 1,
+  repsLow: 0,
+  repsHigh: 0,
+  role: "cardio",
+  minutes,
+});
+
 const session: PlanExercise[] = [
   pe("0001", "primary", 4),
   pe("0002", "primary", 4),
@@ -52,6 +61,25 @@ describe("compressSession", () => {
     const out = compressSession(session, 45);
     const ids = out.map((e) => e.exerciseId);
     expect(ids).toEqual([...ids].sort());
+  });
+
+  it("drops the cardio finisher before touching accessories", () => {
+    const withFinisher = [...session, cardio("0900", 10)];
+    const out = compressSession(withFinisher, 55);
+    expect(out.some((e) => e.role === "cardio")).toBe(false);
+    // accessories only trimmed as far as needed after cardio went first
+    expect(estimateMinutes(out)).toBeLessThanOrEqual(55);
+  });
+
+  it("scales a pure cardio session down instead of emptying it", () => {
+    const out = compressSession([cardio("0900", 15), cardio("0901", 15)], 25);
+    expect(out.length).toBe(2);
+    expect(estimateMinutes(out)).toBeLessThanOrEqual(25);
+    for (const e of out) expect(e.minutes).toBeGreaterThanOrEqual(5);
+  });
+
+  it("counts cardio minutes in the time estimate", () => {
+    expect(estimateMinutes([cardio("0900", 10)])).toBe(15);
   });
 });
 

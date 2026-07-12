@@ -36,6 +36,7 @@ export default async function PlanPage() {
           repsLow: pe.repsLow,
           repsHigh: pe.repsHigh,
           role: pe.role,
+          minutes: pe.minutes ?? null,
         };
       })
       .filter((v) => v !== null),

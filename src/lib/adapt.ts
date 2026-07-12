@@ -1,17 +1,22 @@
 import { exercises, getExercise, type Exercise } from "./exercises";
 import type { PlanExercise, SkipDecision, WorkoutStatus } from "./types";
 
-/** Rough session time model: 5 min warm-up + ~3 min per set including rest. */
+/** Rough session time model: 5 min warm-up + ~3 min per set including rest;
+ *  cardio entries contribute their duration directly. */
 export function estimateMinutes(exs: PlanExercise[]): number {
   if (exs.length === 0) return 0;
-  const totalSets = exs.reduce((sum, e) => sum + e.sets, 0);
-  return 5 + totalSets * 3;
+  const work = exs.reduce(
+    (sum, e) => sum + (e.minutes ?? e.sets * 3),
+    0
+  );
+  return 5 + work;
 }
 
 /**
  * Fit a session into a smaller time budget without losing the point of it:
- * drop accessories from the end, then trim sets down to 2, then drop
- * whatever still doesn't fit. Primaries are the last thing to go.
+ * drop cardio finishers, then accessories from the end, then trim sets down
+ * to 2, then drop whatever still doesn't fit. Primaries are the last thing
+ * to go. A pure-cardio session instead scales its durations down.
  */
 export function compressSession(
   exs: PlanExercise[],
@@ -20,14 +25,32 @@ export function compressSession(
   if (estimateMinutes(exs) <= targetMinutes) return exs;
   const out = exs.map((e) => ({ ...e }));
   const fits = () => estimateMinutes(out) <= targetMinutes;
+  const hasLifting = out.some((e) => e.role !== "cardio");
 
-  while (!fits() && out.length > 2) {
-    const idx = out.map((e) => e.role).lastIndexOf("accessory");
-    if (idx < 0) break;
-    out.splice(idx, 1);
+  if (hasLifting) {
+    // 1: cardio finishers are the first luxury to go
+    while (!fits()) {
+      const idx = out.map((e) => e.role).lastIndexOf("cardio");
+      if (idx < 0) break;
+      out.splice(idx, 1);
+    }
+    while (!fits() && out.length > 2) {
+      const idx = out.map((e) => e.role).lastIndexOf("accessory");
+      if (idx < 0) break;
+      out.splice(idx, 1);
+    }
+    for (let i = out.length - 1; i >= 0 && !fits(); i--) {
+      out[i].sets = Math.min(out[i].sets, 2);
+    }
+    while (!fits() && out.length > 1) out.pop();
+    return out;
   }
-  for (let i = out.length - 1; i >= 0 && !fits(); i--) {
-    out[i].sets = Math.min(out[i].sets, 2);
+
+  // pure cardio session: scale durations down proportionally (min 5 min each)
+  const total = out.reduce((s, e) => s + (e.minutes ?? 0), 0);
+  const available = Math.max(5, targetMinutes - 5);
+  for (const e of out) {
+    e.minutes = Math.max(5, Math.floor((e.minutes ?? 0) * (available / total)));
   }
   while (!fits() && out.length > 1) out.pop();
   return out;

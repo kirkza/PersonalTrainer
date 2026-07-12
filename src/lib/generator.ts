@@ -102,20 +102,54 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+const FINISHER_MINUTES = 10;
+
+/** Pick a cardio exercise, preferring the user's gear and plan-wide variety. */
+function pickCardio(
+  available: Exercise[],
+  allCardio: Exercise[],
+  usedInPlan: Set<string>,
+  rand: () => number
+): Exercise | null {
+  const withGear = available.filter((e) => e.target === "cardiovascular system");
+  const pool = withGear.length > 0 ? withGear : allCardio;
+  const candidates = pool
+    .map((e) => ({
+      e,
+      score:
+        equipmentRank(e.equipment) +
+        (usedInPlan.has(e.id) ? -8 : 0) +
+        -0.12 * e.name.length +
+        rand() * 2,
+    }))
+    .sort((a, b) => b.score - a.score);
+  if (candidates.length === 0) return null;
+  const pick = candidates[Math.floor(rand() * Math.min(3, candidates.length))].e;
+  usedInPlan.add(pick.id);
+  return pick;
+}
+
 export function generatePlan(
   profile: Profile,
   pool: Exercise[],
   seed = 1
 ): GeneratedDay[] {
-  const days = Math.min(6, Math.max(2, profile.daysPerWeek));
+  const totalDays = Math.min(6, Math.max(2, profile.daysPerWeek));
+  const cardioDay = profile.cardioDay && totalDays >= 3;
+  const days = cardioDay ? totalDays - 1 : totalDays;
   const focuses = SPLITS[days];
   const schemes = REP_SCHEMES[profile.goal];
   const available = pool.filter((e) =>
     profile.equipment.includes(e.equipment)
   );
+  const allCardio = pool.filter((e) => e.target === "cardiovascular system");
   const usedInPlan = new Set<string>();
+  // finisher lives inside the session budget: lifting gets the remainder
+  const liftingBudget = profile.cardioFinisher
+    ? Math.max(20, profile.sessionMinutes - FINISHER_MINUTES)
+    : profile.sessionMinutes;
 
-  return focuses.map((focus, dayIdx) => {
+  const liftingDays = focuses.map((focus, dayIdx) => {
     const slots =
       profile.experience === "beginner"
         ? DAY_TEMPLATES[focus].slice(0, 5)
@@ -168,9 +202,51 @@ export function generatePlan(
       });
     });
 
-    return {
-      focus,
-      exercises: compressSession(dayExercises, profile.sessionMinutes),
-    };
+    const compressed = compressSession(dayExercises, liftingBudget);
+
+    if (profile.cardioFinisher) {
+      const rand = mulberry32(seed * 5077 + dayIdx * 977);
+      const cardio = pickCardio(available, allCardio, usedInPlan, rand);
+      if (cardio) {
+        compressed.push({
+          exerciseId: cardio.id,
+          sets: 1,
+          repsLow: 0,
+          repsHigh: 0,
+          role: "cardio",
+          minutes: FINISHER_MINUTES,
+        });
+      }
+    }
+    return { focus, exercises: compressed };
   });
+
+  if (!cardioDay) return liftingDays;
+
+  const rand = mulberry32(seed * 3163);
+  const perExercise = Math.min(
+    15,
+    Math.max(8, Math.floor((profile.sessionMinutes - 5) / 2))
+  );
+  const cardioExercises: PlanExercise[] = [];
+  for (let i = 0; i < 2; i++) {
+    const cardio = pickCardio(available, allCardio, usedInPlan, rand);
+    if (cardio) {
+      cardioExercises.push({
+        exerciseId: cardio.id,
+        sets: 1,
+        repsLow: 0,
+        repsHigh: 0,
+        role: "cardio",
+        minutes: perExercise,
+      });
+    }
+  }
+  return [
+    ...liftingDays,
+    {
+      focus: "Cardio",
+      exercises: compressSession(cardioExercises, profile.sessionMinutes),
+    },
+  ];
 }

@@ -36,6 +36,131 @@ function initialRows(ex: SessionExerciseView): SetRowState[] {
   return rows;
 }
 
+function CardioCard({
+  workoutId,
+  ex,
+}: {
+  workoutId: number;
+  ex: SessionExerciseView;
+}) {
+  const [minutes, setMinutes] = useState(
+    String(ex.logged[0]?.durationMin ?? ex.minutes ?? 10)
+  );
+  const [loggedId, setLoggedId] = useState<number | null>(
+    ex.logged[0]?.id ?? null
+  );
+  const [showSteps, setShowSteps] = useState(false);
+  const [swapping, setSwapping] = useState(false);
+  const [, startTransition] = useTransition();
+  const router = useRouter();
+
+  const lastDuration = ex.lastTime[0]?.durationMin;
+
+  return (
+    <section className="rounded-2xl border border-border-subtle bg-surface p-3">
+      <div className="flex gap-3">
+        <ExerciseGif imageUrl={ex.imageUrl} gifUrl={ex.gifUrl} name={ex.name} />
+        <div className="min-w-0 flex-1">
+          <h3 className="font-semibold capitalize leading-tight">
+            <span className="text-accent">♥ </span>
+            {ex.name}
+          </h3>
+          <p className="text-xs capitalize text-muted">
+            cardio · {ex.equipment}
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            Target: {ex.minutes ?? 10} min
+            {lastDuration != null && (
+              <span className="ml-2 text-xs">(last: {lastDuration} min)</span>
+            )}
+          </p>
+          <div className="mt-1 flex gap-3 text-xs">
+            <button onClick={() => setShowSteps((s) => !s)} className="text-accent">
+              {showSteps ? "Hide how-to" : "How to do it"}
+            </button>
+            <button onClick={() => setSwapping(true)} className="text-warning">
+              ⇄ Swap
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {showSteps && (
+        <ol className="mt-3 flex list-decimal flex-col gap-1 pl-5 text-sm text-muted">
+          {ex.steps.map((s, i) => (
+            <li key={i}>{s}</li>
+          ))}
+        </ol>
+      )}
+
+      <div className="mt-3 flex items-center gap-2">
+        <input
+          type="number"
+          inputMode="numeric"
+          value={minutes}
+          disabled={loggedId !== null}
+          onChange={(e) => setMinutes(e.target.value)}
+          className="w-0 flex-1 rounded-lg border border-border-subtle bg-surface-2 px-2 py-2 text-center text-sm disabled:opacity-60"
+        />
+        <span className="text-xs text-muted">minutes</span>
+        {loggedId === null ? (
+          <button
+            onClick={() => {
+              const m = parseInt(minutes, 10);
+              if (!m || m < 1) return;
+              startTransition(async () => {
+                const { id } = await logSet(
+                  workoutId,
+                  ex.exerciseId,
+                  1,
+                  0,
+                  0,
+                  m
+                );
+                setLoggedId(id);
+              });
+            }}
+            className="rounded-lg bg-accent-strong px-3 py-2 text-sm font-bold text-black"
+          >
+            ✓
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              const id = loggedId;
+              setLoggedId(null);
+              startTransition(() => deleteSet(id));
+            }}
+            className="rounded-lg bg-surface-2 px-3 py-2 text-sm text-danger"
+            aria-label="Remove"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+      {loggedId !== null && (
+        <p className="mt-2 text-right text-xs text-accent">Done ✓</p>
+      )}
+
+      {swapping && (
+        <SwapSheet
+          exerciseId={ex.exerciseId}
+          exerciseName={ex.name}
+          askScope
+          onClose={() => setSwapping(false)}
+          onPick={(newId, always) => {
+            setSwapping(false);
+            startTransition(async () => {
+              await swapInWorkout(workoutId, ex.exerciseId, newId, always);
+              router.refresh();
+            });
+          }}
+        />
+      )}
+    </section>
+  );
+}
+
 function ExerciseCard({
   workoutId,
   ex,
@@ -225,14 +350,18 @@ export default function WorkoutSession({
         )}
       </header>
 
-      {exercises.map((ex) => (
-        <ExerciseCard
-          key={ex.exerciseId}
-          workoutId={workoutId}
-          ex={ex}
-          units={units}
-        />
-      ))}
+      {exercises.map((ex) =>
+        ex.role === "cardio" ? (
+          <CardioCard key={ex.exerciseId} workoutId={workoutId} ex={ex} />
+        ) : (
+          <ExerciseCard
+            key={ex.exerciseId}
+            workoutId={workoutId}
+            ex={ex}
+            units={units}
+          />
+        )
+      )}
 
       <button
         disabled={pending}

@@ -18,6 +18,7 @@ export interface PlanExerciseView {
   repsLow: number;
   repsHigh: number;
   role: string;
+  minutes: number | null;
 }
 
 export interface PlanDayView {
@@ -97,10 +98,16 @@ export default function PlanView({ days }: { days: PlanDayView[] }) {
                         {ex.role === "primary" && (
                           <span className="text-accent">★ </span>
                         )}
+                        {ex.role === "cardio" && (
+                          <span className="text-accent">♥ </span>
+                        )}
                         {ex.name}
                       </span>
                       <span className="text-xs capitalize text-muted">
-                        {ex.sets}×{ex.repsLow}–{ex.repsHigh} · {ex.equipment}
+                        {ex.role === "cardio"
+                          ? `${ex.minutes ?? 10} min`
+                          : `${ex.sets}×${ex.repsLow}–${ex.repsHigh}`}{" "}
+                        · {ex.equipment}
                       </span>
                     </button>
                     <button
