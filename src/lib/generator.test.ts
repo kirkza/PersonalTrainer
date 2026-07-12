@@ -14,6 +14,7 @@ const base: Profile = {
   units: "kg",
   cardioFinisher: false,
   cardioDay: false,
+  weeklyActivities: [],
 };
 
 describe("generatePlan", () => {

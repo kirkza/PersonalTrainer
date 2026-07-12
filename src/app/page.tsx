@@ -3,8 +3,9 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { estimateMinutes, foldIntoSession } from "@/lib/adapt";
-import { getNextSession, getProfile, getWorkouts } from "@/lib/data";
+import { getActivities, getNextSession, getProfile, getWorkouts } from "@/lib/data";
 import { getExercise } from "@/lib/exercises";
+import ActivityCard from "./ActivityCard";
 import TodayActions from "./TodayActions";
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -31,6 +32,15 @@ export default async function TodayPage() {
     ? foldIntoSession(next.planDay.exercises, next.pendingFold.exercises)
     : next.planDay.exercises;
   const estimate = estimateMinutes(sessionExercises);
+
+  const scheduledToday = profile.weeklyActivities.filter(
+    (a) => a.weekday === todayIdx
+  );
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
+  const loggedToday = (await getActivities())
+    .filter((a) => a.performedAt.getTime() >= startOfDay.getTime())
+    .map((a) => ({ id: a.id, name: a.name, minutes: a.minutes }));
 
   return (
     <main className="flex flex-col gap-5">
@@ -99,6 +109,10 @@ export default async function TodayPage() {
           <TodayActions estimateFull={estimate} />
         </>
       )}
+      <ActivityCard
+        scheduledToday={scheduledToday}
+        loggedToday={loggedToday}
+      />
     </main>
   );
 }

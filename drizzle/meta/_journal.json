@@ -15,6 +15,13 @@
       "when": 1783838876895,
       "tag": "0001_cardio",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783869585418,
+      "tag": "0002_activities",
+      "breakpoints": true
     }
   ]
 }

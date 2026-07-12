@@ -3,7 +3,13 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateSettings } from "@/lib/actions";
-import type { Experience, Goal, Profile, Units } from "@/lib/types";
+import type {
+  Experience,
+  Goal,
+  Profile,
+  Units,
+  WeeklyActivity,
+} from "@/lib/types";
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -25,6 +31,12 @@ export default function SettingsForm({
   const [units, setUnits] = useState<Units>(profile.units);
   const [cardioFinisher, setCardioFinisher] = useState(profile.cardioFinisher);
   const [cardioDay, setCardioDay] = useState(profile.cardioDay);
+  const [weeklyActivities, setWeeklyActivities] = useState<WeeklyActivity[]>(
+    profile.weeklyActivities
+  );
+  const [newActivity, setNewActivity] = useState("");
+  const [newActivityDay, setNewActivityDay] = useState(5);
+  const [newActivityMin, setNewActivityMin] = useState("90");
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -39,6 +51,7 @@ export default function SettingsForm({
       units,
       cardioFinisher,
       cardioDay: cardioDay && weekdays.length >= 3,
+      weeklyActivities,
     };
     startTransition(async () => {
       await updateSettings(next, regenerate);
@@ -164,6 +177,81 @@ export default function SettingsForm({
             A dedicated cardio day needs at least 3 training days.
           </p>
         )}
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-muted">
+          Weekly activities (sports, classes…)
+        </h2>
+        {weeklyActivities.map((a, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-between rounded-xl border border-border-subtle bg-surface px-3 py-2 text-sm"
+          >
+            <span>
+              {a.name}{" "}
+              <span className="text-xs text-muted">
+                · {WEEKDAY_LABELS[a.weekday]} · ~{a.minutes} min
+              </span>
+            </span>
+            <button
+              onClick={() =>
+                setWeeklyActivities((list) => list.filter((_, j) => j !== i))
+              }
+              className="pl-3 text-danger"
+              aria-label={`Remove ${a.name}`}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+        <div className="flex flex-col gap-2 rounded-xl border border-border-subtle bg-surface p-3">
+          <input
+            type="text"
+            value={newActivity}
+            onChange={(e) => setNewActivity(e.target.value)}
+            placeholder="e.g. Badminton"
+            className="rounded-lg border border-border-subtle bg-surface-2 px-3 py-2 text-sm outline-none focus:border-accent"
+          />
+          <div className="flex items-center gap-2">
+            <select
+              value={newActivityDay}
+              onChange={(e) => setNewActivityDay(Number(e.target.value))}
+              className="flex-1 rounded-lg border border-border-subtle bg-surface-2 px-2 py-2 text-sm"
+            >
+              {WEEKDAY_LABELS.map((d, i) => (
+                <option key={d} value={i}>
+                  {d}
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={newActivityMin}
+              onChange={(e) => setNewActivityMin(e.target.value)}
+              className="w-20 rounded-lg border border-border-subtle bg-surface-2 px-2 py-2 text-center text-sm"
+            />
+            <span className="text-xs text-muted">min</span>
+            <button
+              disabled={!newActivity.trim() || !parseInt(newActivityMin, 10)}
+              onClick={() => {
+                setWeeklyActivities((list) => [
+                  ...list,
+                  {
+                    name: newActivity.trim(),
+                    weekday: newActivityDay,
+                    minutes: parseInt(newActivityMin, 10),
+                  },
+                ]);
+                setNewActivity("");
+              }}
+              className="rounded-lg bg-accent-strong px-3 py-2 text-sm font-bold text-black disabled:opacity-40"
+            >
+              +
+            </button>
+          </div>
+        </div>
       </section>
 
       <section className="flex flex-col gap-2">

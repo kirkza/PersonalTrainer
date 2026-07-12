@@ -20,7 +20,25 @@ export async function getProfile(): Promise<(Profile & { id: number }) | null> {
     units: r.units as Profile["units"],
     cardioFinisher: r.cardioFinisher,
     cardioDay: r.cardioDay,
+    weeklyActivities: r.weeklyActivities ?? [],
   };
+}
+
+export interface ActivityRow {
+  id: number;
+  name: string;
+  minutes: number;
+  performedAt: Date;
+}
+
+export async function getActivities(): Promise<ActivityRow[]> {
+  const db = await getDb();
+  const rows = await db
+    .select()
+    .from(schema.activities)
+    .orderBy(desc(schema.activities.id))
+    .limit(200);
+  return rows as ActivityRow[];
 }
 
 export interface PlanDayRow {

@@ -21,6 +21,10 @@ export const profile = pgTable("profile", {
   units: text("units").notNull().default("kg"),
   cardioFinisher: boolean("cardio_finisher").notNull().default(false),
   cardioDay: boolean("cardio_day").notNull().default(false),
+  weeklyActivities: jsonb("weekly_activities")
+    .$type<import("@/lib/types").WeeklyActivity[]>()
+    .notNull()
+    .default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -58,6 +62,16 @@ export const workouts = pgTable("workouts", {
   notes: text("notes"),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   finishedAt: timestamp("finished_at", { withTimezone: true }),
+});
+
+/** Non-gym activity log (badminton, hiking, …) — duration-based. */
+export const activities = pgTable("activities", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  minutes: integer("minutes").notNull(),
+  performedAt: timestamp("performed_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const sets = pgTable("sets", {

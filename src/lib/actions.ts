@@ -149,6 +149,24 @@ export async function deleteSet(setId: number) {
   await db.delete(schema.sets).where(eq(schema.sets.id, setId));
 }
 
+export async function logActivity(name: string, minutes: number) {
+  const trimmed = name.trim();
+  if (!trimmed || !minutes || minutes < 1) return;
+  const db = await getDb();
+  await db
+    .insert(schema.activities)
+    .values({ name: trimmed, minutes: Math.round(minutes) });
+  revalidatePath("/");
+  revalidatePath("/progress");
+}
+
+export async function deleteActivity(id: number) {
+  const db = await getDb();
+  await db.delete(schema.activities).where(eq(schema.activities.id, id));
+  revalidatePath("/");
+  revalidatePath("/progress");
+}
+
 export async function finishWorkout(workoutId: number) {
   const db = await getDb();
   const started = await db

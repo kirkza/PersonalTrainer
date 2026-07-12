@@ -15,6 +15,16 @@ export interface Profile {
   cardioFinisher: boolean;
   /** one training day becomes a dedicated cardio session (needs ≥3 days) */
   cardioDay: boolean;
+  /** recurring non-gym activities (e.g. badminton every Saturday) */
+  weeklyActivities: WeeklyActivity[];
+}
+
+export interface WeeklyActivity {
+  name: string;
+  /** 0 = Monday … 6 = Sunday */
+  weekday: number;
+  /** typical duration, prefilled when logging */
+  minutes: number;
 }
 
 /** One prescribed exercise inside a plan day or workout snapshot. */

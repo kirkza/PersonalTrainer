@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { getProfile } from "@/lib/data";
+import { getActivities, getProfile } from "@/lib/data";
 import { getExercise } from "@/lib/exercises";
 import ProgressCharts, { type WeeklyVolumePoint } from "./ProgressCharts";
 
@@ -95,13 +95,20 @@ export default async function ProgressPage() {
     .sort((a, b) => b[1].volume - a[1].volume)
     .slice(0, 6);
 
-  // ----- cardio minutes this week -----
-  const cardioThisWeek = sets.reduce((sum, s) => {
-    const w = workoutById.get(s.workoutId);
-    if (!w || s.durationMin === null) return sum;
-    const t = (w.finishedAt ?? w.startedAt).getTime();
-    return t >= thisMonday.getTime() ? sum + s.durationMin : sum;
-  }, 0);
+  // ----- cardio minutes this week (gym cardio + activities) -----
+  const activities = await getActivities();
+  const cardioThisWeek =
+    sets.reduce((sum, s) => {
+      const w = workoutById.get(s.workoutId);
+      if (!w || s.durationMin === null) return sum;
+      const t = (w.finishedAt ?? w.startedAt).getTime();
+      return t >= thisMonday.getTime() ? sum + s.durationMin : sum;
+    }, 0) +
+    activities.reduce(
+      (sum, a) =>
+        a.performedAt.getTime() >= thisMonday.getTime() ? sum + a.minutes : sum,
+      0
+    );
 
   // ----- streak: consecutive weeks with a completed workout -----
   const weeksWithWork = new Set(
@@ -214,27 +221,42 @@ export default async function ProgressPage() {
           <section className="rounded-2xl border border-border-subtle bg-surface p-3">
             <h2 className="mb-2 text-sm font-semibold">History</h2>
             <ul className="flex flex-col gap-2">
-              {completed.slice(0, 10).map((w) => {
-                const setCount = sets.filter(
-                  (s) => s.workoutId === w.id
-                ).length;
-                return (
+              {[
+                ...completed.map((w) => ({
+                  key: `w${w.id}`,
+                  date: w.finishedAt ?? w.startedAt,
+                  label: "Workout",
+                  detail: `${sets.filter((s) => s.workoutId === w.id).length} sets${
+                    w.notes ? ` · ${w.notes}` : ""
+                  }`,
+                })),
+                ...activities.map((a) => ({
+                  key: `a${a.id}`,
+                  date: a.performedAt,
+                  label: `🏸 ${a.name}`,
+                  detail: `${a.minutes} min`,
+                })),
+              ]
+                .sort((x, y) => y.date.getTime() - x.date.getTime())
+                .slice(0, 12)
+                .map((e) => (
                   <li
-                    key={w.id}
-                    className="flex items-baseline justify-between text-sm"
+                    key={e.key}
+                    className="flex items-baseline justify-between gap-2 text-sm"
                   >
-                    <span>
-                      {(w.finishedAt ?? w.startedAt).toLocaleDateString(
-                        "en-US",
-                        { weekday: "short", month: "short", day: "numeric" }
-                      )}
+                    <span className="min-w-0 truncate">
+                      {e.date.toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                      <span className="ml-2 text-muted">{e.label}</span>
                     </span>
-                    <span className="text-xs text-muted">
-                      {setCount} sets{w.notes ? ` · ${w.notes}` : ""}
+                    <span className="shrink-0 text-xs text-muted">
+                      {e.detail}
                     </span>
                   </li>
-                );
-              })}
+                ))}
             </ul>
           </section>
         </>
