@@ -15,6 +15,7 @@ const base: Profile = {
   cardioFinisher: false,
   cardioDay: false,
   weeklyActivities: [],
+  restSeconds: 60,
 };
 
 describe("generatePlan", () => {

@@ -25,6 +25,7 @@ export const profile = pgTable("profile", {
     .$type<import("@/lib/types").WeeklyActivity[]>()
     .notNull()
     .default([]),
+  restSeconds: integer("rest_seconds").notNull().default(60),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

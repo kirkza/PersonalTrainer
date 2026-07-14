@@ -46,6 +46,7 @@ export default async function WorkoutPage({
       targetMinutes={workout.targetMinutes}
       sessionMinutes={profile.sessionMinutes}
       startedAtIso={workout.startedAt.toISOString()}
+      restSeconds={profile.restSeconds}
       exercises={views}
       units={profile.units}
     />

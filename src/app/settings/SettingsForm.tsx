@@ -34,6 +34,7 @@ export default function SettingsForm({
   const [weeklyActivities, setWeeklyActivities] = useState<WeeklyActivity[]>(
     profile.weeklyActivities
   );
+  const [restSeconds, setRestSeconds] = useState(profile.restSeconds);
   const [newActivity, setNewActivity] = useState("");
   const [newActivityDay, setNewActivityDay] = useState(5);
   const [newActivityMin, setNewActivityMin] = useState("90");
@@ -52,6 +53,7 @@ export default function SettingsForm({
       cardioFinisher,
       cardioDay: cardioDay && weekdays.length >= 3,
       weeklyActivities,
+      restSeconds,
     };
     startTransition(async () => {
       await updateSettings(next, regenerate);
@@ -177,6 +179,23 @@ export default function SettingsForm({
             A dedicated cardio day needs at least 3 training days.
           </p>
         )}
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-muted">
+          Rest timer (after each set)
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          {[0, 45, 60, 90, 120].map((s) => (
+            <button
+              key={s}
+              onClick={() => setRestSeconds(s)}
+              className={chip(restSeconds === s)}
+            >
+              {s === 0 ? "off" : `${s}s`}
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="flex flex-col gap-2">

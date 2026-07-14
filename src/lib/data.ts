@@ -21,6 +21,7 @@ export async function getProfile(): Promise<(Profile & { id: number }) | null> {
     cardioFinisher: r.cardioFinisher,
     cardioDay: r.cardioDay,
     weeklyActivities: r.weeklyActivities ?? [],
+    restSeconds: r.restSeconds ?? 60,
   };
 }
 

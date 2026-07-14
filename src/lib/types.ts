@@ -17,6 +17,8 @@ export interface Profile {
   cardioDay: boolean;
   /** recurring non-gym activities (e.g. badminton every Saturday) */
   weeklyActivities: WeeklyActivity[];
+  /** rest countdown auto-started after each logged set; 0 = off */
+  restSeconds: number;
 }
 
 export interface WeeklyActivity {

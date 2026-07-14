@@ -11,6 +11,10 @@ import {
 } from "@/lib/actions";
 import type { SessionExerciseView } from "@/lib/data";
 import ExerciseGif from "@/components/ExerciseGif";
+import RestTimer, {
+  maybeRequestNotifications,
+  primeAudio,
+} from "@/components/RestTimer";
 import SwapSheet from "@/components/SwapSheet";
 
 interface SetRowState {
@@ -199,10 +203,12 @@ function ExerciseCard({
   workoutId,
   ex,
   units,
+  onSetLogged,
 }: {
   workoutId: number;
   ex: SessionExerciseView;
   units: string;
+  onSetLogged: () => void;
 }) {
   const router = useRouter();
   const [rows, setRows] = useState<SetRowState[]>(() => initialRows(ex));
@@ -218,6 +224,10 @@ function ExerciseCard({
     const reps = parseInt(row.reps, 10);
     const weight = parseFloat(row.weight) || 0;
     if (!reps || reps < 1) return;
+    // inside the tap gesture: unlock audio + (once) ask notification permission
+    primeAudio();
+    maybeRequestNotifications();
+    onSetLogged();
     startTransition(async () => {
       const { id } = await logSet(workoutId, ex.exerciseId, i + 1, reps, weight);
       update(i, { id });
@@ -364,6 +374,7 @@ export default function WorkoutSession({
   targetMinutes,
   sessionMinutes,
   startedAtIso,
+  restSeconds,
   exercises,
   units,
 }: {
@@ -372,10 +383,16 @@ export default function WorkoutSession({
   targetMinutes: number | null;
   sessionMinutes: number;
   startedAtIso: string;
+  restSeconds: number;
   exercises: SessionExerciseView[];
   units: string;
 }) {
   const [pending, startTransition] = useTransition();
+  const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
+
+  const startRest = () => {
+    if (restSeconds > 0) setRestEndsAt(Date.now() + restSeconds * 1000);
+  };
 
   return (
     <main className="flex flex-col gap-4">
@@ -403,8 +420,17 @@ export default function WorkoutSession({
             workoutId={workoutId}
             ex={ex}
             units={units}
+            onSetLogged={startRest}
           />
         )
+      )}
+
+      {restEndsAt !== null && (
+        <RestTimer
+          endsAt={restEndsAt}
+          onDismiss={() => setRestEndsAt(null)}
+          onExtend={(extra) => setRestEndsAt((t) => (t ?? Date.now()) + extra)}
+        />
       )}
 
       <button

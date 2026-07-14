@@ -76,6 +76,7 @@ export default function OnboardingWizard({
       cardioFinisher,
       cardioDay: cardioDay && weekdays.length >= 3,
       weeklyActivities: [],
+      restSeconds: 60,
     };
     startTransition(() => completeOnboarding(profile));
   };
