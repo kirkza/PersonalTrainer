@@ -110,6 +110,25 @@ export default async function ProgressPage() {
       0
     );
 
+  // ----- session durations (start → finish; ignore forgotten sessions >4h) -----
+  const durationOf = (w: (typeof completed)[number]): number | null => {
+    if (!w.finishedAt) return null;
+    const min = Math.round(
+      (w.finishedAt.getTime() - w.startedAt.getTime()) / 60000
+    );
+    return min >= 0 && min <= 240 ? min : null;
+  };
+  const recentDurations = completed
+    .slice(0, 10)
+    .map(durationOf)
+    .filter((d): d is number => d !== null);
+  const avgSessionMin =
+    recentDurations.length > 0
+      ? Math.round(
+          recentDurations.reduce((a, b) => a + b, 0) / recentDurations.length
+        )
+      : null;
+
   // ----- streak: consecutive weeks with a completed workout -----
   const weeksWithWork = new Set(
     completed.map((w) =>
@@ -149,6 +168,20 @@ export default async function ProgressPage() {
           <div className="text-2xl font-bold">{cardioThisWeek}</div>
           <div className="text-[11px] text-muted">cardio min this week</div>
         </div>
+        {avgSessionMin !== null && (
+          <div className="col-span-2 rounded-xl border border-border-subtle bg-surface p-3 text-center">
+            <div className="text-2xl font-bold">
+              {avgSessionMin}
+              <span className="text-sm font-normal text-muted">
+                {" "}
+                / {profile.sessionMinutes} min target
+              </span>
+            </div>
+            <div className="text-[11px] text-muted">
+              avg session length (last {recentDurations.length})
+            </div>
+          </div>
+        )}
       </div>
 
       {completed.length === 0 ? (
@@ -222,14 +255,17 @@ export default async function ProgressPage() {
             <h2 className="mb-2 text-sm font-semibold">History</h2>
             <ul className="flex flex-col gap-2">
               {[
-                ...completed.map((w) => ({
-                  key: `w${w.id}`,
-                  date: w.finishedAt ?? w.startedAt,
-                  label: "Workout",
-                  detail: `${sets.filter((s) => s.workoutId === w.id).length} sets${
-                    w.notes ? ` · ${w.notes}` : ""
-                  }`,
-                })),
+                ...completed.map((w) => {
+                  const dur = durationOf(w);
+                  return {
+                    key: `w${w.id}`,
+                    date: w.finishedAt ?? w.startedAt,
+                    label: "Workout",
+                    detail: `${sets.filter((s) => s.workoutId === w.id).length} sets${
+                      dur !== null ? ` · ${dur} min` : ""
+                    }`,
+                  };
+                }),
                 ...activities.map((a) => ({
                   key: `a${a.id}`,
                   date: a.performedAt,

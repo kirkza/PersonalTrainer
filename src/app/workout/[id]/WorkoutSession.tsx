@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   deleteSet,
@@ -17,6 +17,40 @@ interface SetRowState {
   id: number | null; // null = not logged yet
   reps: string;
   weight: string;
+}
+
+/** Live session clock — a nudge that time in the gym ≠ work done. */
+function ElapsedTimer({
+  startedAtIso,
+  targetMinutes,
+}: {
+  startedAtIso: string;
+  targetMinutes: number;
+}) {
+  const startedMs = new Date(startedAtIso).getTime();
+  const [elapsedMin, setElapsedMin] = useState(() =>
+    Math.max(0, Math.floor((Date.now() - startedMs) / 60000))
+  );
+
+  useEffect(() => {
+    const tick = () =>
+      setElapsedMin(Math.max(0, Math.floor((Date.now() - startedMs) / 60000)));
+    tick();
+    const id = setInterval(tick, 15000);
+    return () => clearInterval(id);
+  }, [startedMs]);
+
+  const over = elapsedMin > targetMinutes;
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs ${
+        over ? "bg-warning/20 text-warning" : "bg-surface-2 text-muted"
+      }`}
+      title={over ? `Over your ${targetMinutes} min target` : undefined}
+    >
+      ⏱ {elapsedMin} / {targetMinutes} min
+    </span>
+  );
 }
 
 function initialRows(ex: SessionExerciseView): SetRowState[] {
@@ -328,12 +362,16 @@ export default function WorkoutSession({
   workoutId,
   focus,
   targetMinutes,
+  sessionMinutes,
+  startedAtIso,
   exercises,
   units,
 }: {
   workoutId: number;
   focus: string;
   targetMinutes: number | null;
+  sessionMinutes: number;
+  startedAtIso: string;
   exercises: SessionExerciseView[];
   units: string;
 }) {
@@ -341,13 +379,19 @@ export default function WorkoutSession({
 
   return (
     <main className="flex flex-col gap-4">
-      <header className="flex items-baseline justify-between">
-        <h1 className="text-xl font-bold">{focus}</h1>
-        {targetMinutes && (
-          <span className="rounded-full bg-warning/20 px-2 py-0.5 text-xs text-warning">
-            ⏱ {targetMinutes} min version
-          </span>
-        )}
+      <header className="flex items-baseline justify-between gap-2">
+        <h1 className="text-xl font-bold">
+          {focus}
+          {targetMinutes && (
+            <span className="ml-2 align-middle text-xs font-normal text-warning">
+              (short version)
+            </span>
+          )}
+        </h1>
+        <ElapsedTimer
+          startedAtIso={startedAtIso}
+          targetMinutes={targetMinutes ?? sessionMinutes}
+        />
       </header>
 
       {exercises.map((ex) =>

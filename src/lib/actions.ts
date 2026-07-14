@@ -169,21 +169,10 @@ export async function deleteActivity(id: number) {
 
 export async function finishWorkout(workoutId: number) {
   const db = await getDb();
-  const started = await db
-    .select()
-    .from(schema.workouts)
-    .where(eq(schema.workouts.id, workoutId))
-    .limit(1);
-  const durationMin = started[0]
-    ? Math.round((Date.now() - started[0].startedAt.getTime()) / 60000)
-    : null;
+  // duration is derived from startedAt/finishedAt wherever it's displayed
   await db
     .update(schema.workouts)
-    .set({
-      status: "completed",
-      finishedAt: new Date(),
-      notes: durationMin !== null ? `${durationMin} min` : null,
-    })
+    .set({ status: "completed", finishedAt: new Date() })
     .where(eq(schema.workouts.id, workoutId));
   revalidatePath("/");
   revalidatePath("/progress");
