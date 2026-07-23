@@ -39,7 +39,8 @@ export default function SwapSheet({
               Swap <span className="capitalize">{exerciseName}</span>
             </h3>
             <p className="mb-3 text-xs text-muted">
-              Same target muscle, matched to your gym&apos;s equipment
+              Same target muscle, matched to your gym&apos;s equipment · tap a
+              picture to preview it
             </p>
             {alts === null ? (
               <p className="py-8 text-center text-sm text-muted">Loading…</p>
@@ -50,28 +51,31 @@ export default function SwapSheet({
             ) : (
               <ul className="flex flex-col gap-2">
                 {alts.map((a) => (
-                  <li key={a.id}>
+                  <li
+                    key={a.id}
+                    className="flex items-center gap-3 rounded-xl border border-border-subtle bg-surface-2 p-2"
+                  >
+                    {/* separate tap targets: picture previews, name selects */}
+                    <ExerciseGif
+                      imageUrl={a.imageUrl}
+                      gifUrl={a.gifUrl}
+                      name={a.name}
+                      size={56}
+                    />
                     <button
                       onClick={() =>
                         askScope ? setChosen(a) : onPick(a.id, true)
                       }
-                      className="flex w-full items-center gap-3 rounded-xl border border-border-subtle bg-surface-2 p-2 text-left"
+                      className="min-w-0 flex-1 py-2 text-left"
                     >
-                      <ExerciseGif
-                        imageUrl={a.imageUrl}
-                        gifUrl={a.gifUrl}
-                        name={a.name}
-                        size={56}
-                      />
-                      <span>
-                        <span className="block text-sm font-medium capitalize">
-                          {a.name}
-                        </span>
-                        <span className="text-xs capitalize text-muted">
-                          {a.equipment}
-                        </span>
+                      <span className="block text-sm font-medium capitalize">
+                        {a.name}
+                      </span>
+                      <span className="text-xs capitalize text-muted">
+                        {a.equipment}
                       </span>
                     </button>
+                    <span className="pr-1 text-muted">›</span>
                   </li>
                 ))}
               </ul>
