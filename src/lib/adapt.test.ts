@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   alternativesFor,
+  chooseNextPosition,
   compressSession,
   estimateMinutes,
   foldIntoSession,
   nextPosition,
+  type PlanDaySummary,
+  type SessionHistoryEntry,
 } from "./adapt";
 import { exercises } from "./exercises";
 import type { PlanExercise } from "./types";
@@ -117,6 +120,116 @@ describe("nextPosition", () => {
       ])
     ).toBe(1);
   });
+
+  it("clamps a position carried over from a longer previous cycle", () => {
+    // last plan had 6 days; the new one has 4 — position 5 must stay in range
+    expect(
+      nextPosition(4, [
+        { position: 5, status: "skipped", skipDecision: "shift" },
+      ])
+    ).toBe(1);
+  });
+});
+
+// ---- muscle-recovery aware scheduling -------------------------------------
+
+const idFor = (target: string) => exercises.find((e) => e.target === target)!.id;
+
+const dayOf = (position: number, targets: string[]): PlanDaySummary => ({
+  position,
+  exercises: targets.map((t, i) => ({
+    exerciseId: idFor(t),
+    sets: 3,
+    repsLow: 8,
+    repsHigh: 12,
+    role: i < 2 ? "primary" : "accessory",
+  })),
+});
+
+const UPPER_A = ["pectorals", "lats", "delts", "triceps"];
+const UPPER_B = ["delts", "pectorals", "lats", "biceps"];
+const LOWER_A = ["quads", "hamstrings", "glutes", "calves"];
+const LOWER_B = ["hamstrings", "glutes", "quads", "calves"];
+
+const upperLowerPlan: PlanDaySummary[] = [
+  dayOf(0, UPPER_A),
+  dayOf(1, LOWER_A),
+  dayOf(2, UPPER_B),
+  dayOf(3, LOWER_B),
+];
+
+const NOW = new Date("2026-07-26T18:00:00Z");
+const daysAgo = (n: number) =>
+  new Date(NOW.getTime() - n * 24 * 3600 * 1000);
+
+const trained = (
+  position: number,
+  targets: string[],
+  at: Date
+): SessionHistoryEntry => ({
+  position,
+  status: "completed",
+  at,
+  exercises: dayOf(position, targets).exercises,
+});
+
+describe("chooseNextPosition", () => {
+  it("follows the plan sequence when nothing collides", () => {
+    expect(
+      chooseNextPosition(
+        upperLowerPlan,
+        [trained(0, UPPER_A, daysAgo(1))],
+        NOW
+      )
+    ).toBe(1);
+  });
+
+  it("does not stack a second upper day on top of yesterday's upper day", () => {
+    // Upper A done yesterday, Lower A skipped — the sequence points at Upper B
+    const history: SessionHistoryEntry[] = [
+      trained(0, UPPER_A, daysAgo(1)),
+      { position: 1, status: "skipped", skipDecision: "drop", at: daysAgo(0) },
+    ];
+    expect(nextPosition(4, history)).toBe(2); // raw sequence: Upper B
+    expect(chooseNextPosition(upperLowerPlan, history, NOW)).toBe(3); // Lower B
+  });
+
+  it("allows the same muscles again once they have had a rest day", () => {
+    const history: SessionHistoryEntry[] = [
+      trained(0, UPPER_A, daysAgo(3)),
+      { position: 1, status: "skipped", skipDecision: "drop", at: daysAgo(3) },
+    ];
+    expect(chooseNextPosition(upperLowerPlan, history, NOW)).toBe(2);
+  });
+
+  it("keeps the sequence day when every day overlaps (full-body plan)", () => {
+    const fullBody = [
+      dayOf(0, ["quads", "pectorals", "lats", "delts"]),
+      dayOf(1, ["glutes", "delts", "pectorals", "quads"]),
+    ];
+    const history = [trained(0, ["quads", "pectorals", "lats", "delts"], daysAgo(0))];
+    expect(chooseNextPosition(fullBody, history, NOW)).toBe(1);
+  });
+
+  it("resumes where the user left off after the plan is regenerated", () => {
+    // history carries a position from the plan that was just replaced
+    const history = [trained(2, UPPER_B, daysAgo(1))];
+    expect(chooseNextPosition(upperLowerPlan, history, NOW)).toBe(3);
+  });
+
+  it("skips ahead rather than repeating upper body the day after a reset", () => {
+    // the old plan's last day was an upper day; the new plan's day 0 is too
+    const history = [trained(3, UPPER_B, daysAgo(1))];
+    expect(nextPosition(4, history)).toBe(0); // raw sequence: Upper A
+    expect(chooseNextPosition(upperLowerPlan, history, NOW)).toBe(1); // Lower A
+  });
+
+  it("ignores skipped sessions when working out what is still sore", () => {
+    const history: SessionHistoryEntry[] = [
+      { position: 0, status: "skipped", skipDecision: "drop", at: daysAgo(0), exercises: dayOf(0, UPPER_A).exercises },
+    ];
+    expect(chooseNextPosition(upperLowerPlan, history, NOW)).toBe(1);
+  });
 });
 
 describe("foldIntoSession", () => {
@@ -149,9 +262,13 @@ describe("alternativesFor", () => {
   });
 
   it("falls back to any equipment when the user's gear has no match", () => {
-    const rare = exercises.find((e) => e.target === "levator scapulae")!;
+    // adductors is the smallest pool, and none of it uses a tire
+    const rare = exercises.find((e) => e.target === "adductors")!;
     const alts = alternativesFor(rare.id, ["tire"], 10);
-    // levator scapulae has 2 exercises total; the other one should appear
     expect(alts.length).toBeGreaterThan(0);
+    for (const alt of alts) {
+      expect(alt.target).toBe("adductors");
+      expect(alt.equipment).not.toBe("tire");
+    }
   });
 });

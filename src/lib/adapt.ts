@@ -60,12 +60,18 @@ export interface SessionHistoryEntry {
   position: number;
   status: WorkoutStatus;
   skipDecision?: SkipDecision | null;
+  /** when the session happened — drives the muscle-recovery check */
+  at?: Date;
+  /** what the session prescribed, for muscle-overlap checks */
+  exercises?: PlanExercise[];
 }
 
 /**
- * Which plan day comes next? Sessions run in sequence; completing (or
- * dropping/folding a skipped) session advances the pointer, while a session
- * skipped with "shift" stays next — the whole week slides instead.
+ * Which plan day comes next by sequence alone? Sessions run in order;
+ * completing (or dropping/folding a skipped) session advances the pointer,
+ * while a session skipped with "shift" stays next — the whole week slides
+ * instead. Positions are wrapped, so history from a longer plan still lands
+ * inside the current one.
  */
 export function nextPosition(
   dayCount: number,
@@ -74,10 +80,84 @@ export function nextPosition(
   for (let i = history.length - 1; i >= 0; i--) {
     const h = history[i];
     if (h.status === "in_progress") continue;
-    if (h.status === "skipped" && h.skipDecision === "shift") return h.position;
+    if (h.status === "skipped" && h.skipDecision === "shift") {
+      return h.position % dayCount;
+    }
     return (h.position + 1) % dayCount;
   }
   return 0;
+}
+
+export interface PlanDaySummary {
+  position: number;
+  exercises: PlanExercise[];
+}
+
+/** Muscles a session trains under load. Cardio doesn't need recovery here. */
+export function sessionMuscles(exs: PlanExercise[]): Set<string> {
+  const out = new Set<string>();
+  for (const e of exs) {
+    if (e.role === "cardio") continue;
+    const ex = getExercise(e.exerciseId);
+    if (ex) out.add(ex.target);
+  }
+  return out;
+}
+
+/** Local calendar day as an integer, so "yesterday" is a simple subtraction. */
+function calendarDay(d: Date): number {
+  return Math.floor((d.getTime() - d.getTimezoneOffset() * 60_000) / 86_400_000);
+}
+
+/** A session trained today or yesterday still counts as unrecovered. */
+const RECOVERY_DAYS = 1;
+/** Above this share of repeated muscles, a day is too soon to run again. */
+const MAX_OVERLAP = 0.5;
+
+function overlapRatio(dayMuscles: Set<string>, recent: Set<string>): number {
+  if (dayMuscles.size === 0) return 0;
+  let repeated = 0;
+  for (const m of dayMuscles) if (recent.has(m)) repeated++;
+  return repeated / dayMuscles.size;
+}
+
+/**
+ * Which plan day to actually train next. Starts from the sequence pointer,
+ * then rotates forward past any day that would hit muscles trained today or
+ * yesterday — so skipping a leg day doesn't hand you two upper days back to
+ * back, and regenerating the plan doesn't restart you on what you just did.
+ * The skipped day stays in the rotation and comes back around.
+ *
+ * When every day overlaps (full-body splits), the sequence pointer wins:
+ * there is no better day to offer.
+ */
+export function chooseNextPosition(
+  days: PlanDaySummary[],
+  history: SessionHistoryEntry[],
+  now: Date = new Date()
+): number {
+  if (days.length === 0) return 0;
+  const start = nextPosition(days.length, history);
+  const today = calendarDay(now);
+
+  const recent = new Set<string>();
+  for (const h of history) {
+    if (h.status !== "completed" || !h.at || !h.exercises) continue;
+    if (today - calendarDay(h.at) > RECOVERY_DAYS) continue;
+    for (const m of sessionMuscles(h.exercises)) recent.add(m);
+  }
+  if (recent.size === 0) return start;
+
+  const byPosition = new Map(days.map((d) => [d.position, d]));
+  for (let i = 0; i < days.length; i++) {
+    const pos = (start + i) % days.length;
+    const day = byPosition.get(pos);
+    if (!day) continue;
+    if (overlapRatio(sessionMuscles(day.exercises), recent) <= MAX_OVERLAP) {
+      return pos;
+    }
+  }
+  return start;
 }
 
 /** Merge a missed session's key lifts into the next one (max 2, light sets). */

@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { getExercise, gifUrl, imageUrl } from "./exercises";
-import { nextPosition, type SessionHistoryEntry } from "./adapt";
+import { chooseNextPosition, type SessionHistoryEntry } from "./adapt";
 import type { PlanExercise, Profile, SkipDecision, WorkoutStatus } from "./types";
 
 export async function getProfile(): Promise<(Profile & { id: number }) | null> {
@@ -99,7 +99,19 @@ export async function getWorkout(id: number): Promise<WorkoutRow | null> {
   return (rows[0] as WorkoutRow) ?? null;
 }
 
-/** The plan day the user should do next, honoring shift-skips. */
+/**
+ * Position of every plan day ever created, including retired plans — a
+ * regenerated plan must not erase where the user was in the rotation.
+ */
+async function allPlanDayPositions(): Promise<Map<number, number>> {
+  const db = await getDb();
+  const rows = await db
+    .select({ id: schema.planDays.id, position: schema.planDays.position })
+    .from(schema.planDays);
+  return new Map(rows.map((r) => [r.id, r.position]));
+}
+
+/** The plan day the user should do next, honoring shift-skips and recovery. */
 export async function getNextSession(): Promise<{
   planDay: PlanDayRow;
   pendingFold: WorkoutRow | null;
@@ -112,16 +124,19 @@ export async function getNextSession(): Promise<{
   const inProgress =
     workouts.filter((w) => w.status === "in_progress").at(-1) ?? null;
 
-  const positionById = new Map(days.map((d) => [d.id, d.position]));
+  const positionById = await allPlanDayPositions();
   const history: SessionHistoryEntry[] = workouts
     .filter((w) => w.planDayId !== null && positionById.has(w.planDayId))
     .map((w) => ({
       position: positionById.get(w.planDayId!)!,
       status: w.status,
       skipDecision: w.skipDecision,
+      at: w.finishedAt ?? w.startedAt,
+      // the snapshot, not the plan day — it survives regeneration and swaps
+      exercises: w.exercises,
     }));
 
-  const pos = nextPosition(days.length, history);
+  const pos = chooseNextPosition(days, history);
   const planDay = days.find((d) => d.position === pos) ?? days[0];
 
   // a recent skip the user asked to fold into the next session
