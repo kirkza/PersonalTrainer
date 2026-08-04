@@ -3,10 +3,10 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
-  getActivePlanDays,
   getProfile,
   getSetsForWorkout,
   getWorkout,
+  planDayFocusById,
 } from "@/lib/data";
 import { summarizeSession } from "@/lib/session-summary";
 
@@ -43,13 +43,17 @@ export default async function WorkoutSummaryPage({
   if (workout.status === "in_progress") redirect(`/workout/${workoutId}`);
   if (workout.status !== "completed") redirect("/");
 
-  const [sets, planDays] = await Promise.all([
+  const [sets, focusById] = await Promise.all([
     getSetsForWorkout(workoutId),
-    getActivePlanDays(),
+    planDayFocusById(),
   ]);
 
+  // across all plans, not just the active one — a regenerated plan must not
+  // rename the sessions you already finished
   const focus =
-    planDays.find((d) => d.id === workout.planDayId)?.focus ?? "Workout";
+    (workout.planDayId === null
+      ? undefined
+      : focusById.get(workout.planDayId)) ?? "Workout";
   const summary = summarizeSession(workout, sets, profile);
   const over =
     summary.durationMin !== null && summary.durationMin > summary.targetMinutes;

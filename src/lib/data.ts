@@ -111,6 +111,21 @@ async function allPlanDayPositions(): Promise<Map<number, number>> {
   return new Map(rows.map((r) => [r.id, r.position]));
 }
 
+/**
+ * Focus of every plan day ever created, including retired plans. A summary of a
+ * past session has to keep its title after the plan is regenerated: `planDayId`
+ * survives (it is `set null` only on delete, and plans are retired rather than
+ * deleted), so looking only at the active plan would silently rename every
+ * older session to "Workout".
+ */
+export async function planDayFocusById(): Promise<Map<number, string>> {
+  const db = await getDb();
+  const rows = await db
+    .select({ id: schema.planDays.id, focus: schema.planDays.focus })
+    .from(schema.planDays);
+  return new Map(rows.map((r) => [r.id, r.focus]));
+}
+
 /** The plan day the user should do next, honoring shift-skips and recovery. */
 export async function getNextSession(): Promise<{
   planDay: PlanDayRow;
