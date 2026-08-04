@@ -140,10 +140,12 @@ export async function swapSession(planDayId: number) {
   // reachable: the plan can be regenerated while the swap sheet sits open
   if (!chosen) redirect("/");
 
+  // Only when the pick differs from the prescription. A shift row for a position
+  // that is about to be completed would never clear — the pending-shift rule is
+  // position-scoped — and distinct plan-day ids in one plan mean distinct
+  // positions, so this guard is what keeps the two inserts independent. Their
+  // order does not matter.
   if (chosen.id !== next.planDay.id) {
-    // Written BEFORE the new session on purpose: history is ordered by id, and
-    // the pending-shift rule asks whether this position was completed *after*
-    // the shift. Reversing these two inserts would answer that wrongly.
     await db.insert(schema.workouts).values({
       planDayId: next.planDay.id,
       exercises: next.planDay.exercises,

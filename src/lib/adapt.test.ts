@@ -167,6 +167,35 @@ describe("nextPosition", () => {
       ])
     ).toBe(1);
   });
+
+  it("releases a shift carried over from a longer plan once its wrapped day is trained", () => {
+    // recorded under a 6-day plan, now running 4 days: it is offered as 5 % 4 = 1,
+    // so training position 1 has to be what clears it
+    expect(
+      nextPosition(4, [
+        { position: 5, status: "skipped", skipDecision: "shift" },
+        { position: 1, status: "completed" },
+      ])
+    ).toBe(2);
+  });
+
+  it("releases a shifted session that is later dropped", () => {
+    expect(
+      nextPosition(4, [
+        { position: 1, status: "skipped", skipDecision: "shift" },
+        { position: 1, status: "skipped", skipDecision: "drop" },
+      ])
+    ).toBe(2);
+  });
+
+  it("releases a shifted session that is later folded in", () => {
+    expect(
+      nextPosition(4, [
+        { position: 1, status: "skipped", skipDecision: "shift" },
+        { position: 1, status: "skipped", skipDecision: "fold" },
+      ])
+    ).toBe(2);
+  });
 });
 
 // ---- muscle-recovery aware scheduling -------------------------------------

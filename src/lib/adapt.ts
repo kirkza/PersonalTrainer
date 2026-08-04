@@ -67,6 +67,28 @@ export interface SessionHistoryEntry {
 }
 
 /**
+ * Has a shifted-aside day been dealt with? Training it clears it, and so does
+ * dropping or folding it — those are the user saying "move on". Positions are
+ * compared wrapped, because that is how the day was offered: a shift recorded
+ * under a longer plan is offered as `position % dayCount`, so it has to be
+ * clearable by finishing *that* day rather than an index no plan day can
+ * produce any more.
+ */
+function shiftResolved(
+  shift: SessionHistoryEntry,
+  later: SessionHistoryEntry[],
+  dayCount: number
+): boolean {
+  const offered = shift.position % dayCount;
+  return later.some(
+    (x) =>
+      x.position % dayCount === offered &&
+      (x.status === "completed" ||
+        (x.status === "skipped" && x.skipDecision !== "shift"))
+  );
+}
+
+/**
  * Which plan day comes next by sequence alone? Sessions run in order;
  * completing (or dropping/folding a skipped) session advances the pointer.
  * A session skipped with "shift" stays next until that day is actually
@@ -85,9 +107,7 @@ export function nextPosition(
     (h, i) =>
       h.status === "skipped" &&
       h.skipDecision === "shift" &&
-      !history
-        .slice(i + 1)
-        .some((x) => x.status === "completed" && x.position === h.position)
+      !shiftResolved(h, history.slice(i + 1), dayCount)
   );
   if (pending) return pending.position % dayCount;
 

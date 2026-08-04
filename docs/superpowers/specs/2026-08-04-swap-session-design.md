@@ -52,10 +52,14 @@ existing "Shift my week" button, which promises "do this session next time I
 train"; it is fatal for a swap, whose whole point is that the passed-over day
 comes back.
 
-New rule: **a day shifted aside stays next until it is actually trained.** A
-shift is *pending* when no `completed` session for that position appears after
-it in history. When several are pending, the earliest wins — the day you have
-been putting off longest comes first.
+New rule: **a day shifted aside stays next until it is dealt with.** A shift is
+*cleared* by an entry for that day appearing after it in history — `completed`,
+or `skipped` with `drop` or `fold`, both of which are the user saying "move on".
+Positions are compared **wrapped** (`position % dayCount`), because that is how
+the day is offered: a shift recorded under a longer plan is offered as
+`position % dayCount`, so finishing *that* day is what has to clear it. Anything
+else leaves it pending. When several are pending, the earliest wins — the day you
+have been putting off longest comes first.
 
 ```ts
 export function nextPosition(
@@ -135,9 +139,12 @@ export async function swapSession(planDayId: number): Promise<void>;
 3. If the pick **is** the prescribed day, skip step 4 — there is nothing to set
    aside.
 4. Otherwise insert a `skipped` / `shift` workout row for the prescribed day.
-   **It must be inserted before the chosen session's row.** History is ordered
-   by id, and the pending-shift rule asks "was this position completed *after*
-   the shift?" — reversing the order would answer that wrongly.
+   The **guard in step 3 is the load-bearing part, not the insert order.** The
+   pending-shift rule is position-scoped, so order would matter only if the
+   shifted and chosen positions were equal — `[shift(P), completed(P)]` clears
+   the shift, `[completed(P), shift(P)]` leaves it pending. Distinct plan-day
+   ids within one active plan mean distinct positions, so step 3 rules that case
+   out and the two inserts are independent: either order gives the same result.
 5. `beginSession(chosen, next.pendingFold, null)`, then `revalidatePath("/")`
    and redirect into the workout.
 
