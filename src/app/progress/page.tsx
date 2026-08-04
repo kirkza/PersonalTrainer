@@ -156,9 +156,12 @@ export default async function ProgressPage() {
         key: `w${w.id}`,
         date: w.finishedAt ?? w.startedAt,
         label: "Workout",
-        detail: `${sets.filter((s) => s.workoutId === w.id).length} sets${
-          dur !== null ? ` · ${dur} min` : ""
-        }`,
+        // lifting sets only, matching the summary this row links to — cardio
+        // rows live in the same table but are represented by the minutes below
+        detail: `${
+          sets.filter((s) => s.workoutId === w.id && s.durationMin === null)
+            .length
+        } sets${dur !== null ? ` · ${dur} min` : ""}`,
         href: `/workout/${w.id}/summary`,
       };
     }),
