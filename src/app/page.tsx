@@ -2,11 +2,17 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { estimateMinutes, foldIntoSession } from "@/lib/adapt";
-import { getActivities, getNextSession, getProfile, getWorkouts } from "@/lib/data";
+import { estimateMinutes, foldIntoSession, sessionMuscles } from "@/lib/adapt";
+import {
+  getActivePlanDays,
+  getActivities,
+  getNextSession,
+  getProfile,
+  getWorkouts,
+} from "@/lib/data";
 import { getExercise } from "@/lib/exercises";
 import ActivityCard from "./ActivityCard";
-import TodayActions from "./TodayActions";
+import TodayActions, { type SwapDay } from "./TodayActions";
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -32,6 +38,16 @@ export default async function TodayPage() {
     ? foldIntoSession(next.planDay.exercises, next.pendingFold.exercises)
     : next.planDay.exercises;
   const estimate = estimateMinutes(sessionExercises);
+
+  // the other plan days, offered when today's prescription doesn't suit
+  const swapDays: SwapDay[] = (await getActivePlanDays())
+    .filter((d) => d.id !== next.planDay.id)
+    .map((d) => ({
+      id: d.id,
+      focus: d.focus,
+      muscles: [...sessionMuscles(d.exercises)].slice(0, 3),
+      estimate: estimateMinutes(d.exercises),
+    }));
 
   const scheduledToday = profile.weeklyActivities.filter(
     (a) => a.weekday === todayIdx
@@ -106,7 +122,7 @@ export default async function TodayPage() {
               })}
             </ul>
           </section>
-          <TodayActions estimateFull={estimate} />
+          <TodayActions estimateFull={estimate} swapDays={swapDays} />
         </>
       )}
       <ActivityCard
