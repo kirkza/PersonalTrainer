@@ -1,10 +1,12 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { getActivities, getProfile } from "@/lib/data";
 import { getExercise } from "@/lib/exercises";
+import { sessionDurationMin } from "@/lib/session-summary";
 import ProgressCharts, { type WeeklyVolumePoint } from "./ProgressCharts";
 
 function mondayOf(d: Date): Date {
@@ -110,14 +112,9 @@ export default async function ProgressPage() {
       0
     );
 
-  // ----- session durations (start → finish; ignore forgotten sessions >4h) -----
-  const durationOf = (w: (typeof completed)[number]): number | null => {
-    if (!w.finishedAt) return null;
-    const min = Math.round(
-      (w.finishedAt.getTime() - w.startedAt.getTime()) / 60000
-    );
-    return min >= 0 && min <= 240 ? min : null;
-  };
+  // ----- session durations (start → finish) -----
+  const durationOf = (w: (typeof completed)[number]): number | null =>
+    sessionDurationMin(w.startedAt, w.finishedAt);
   const recentDurations = completed
     .slice(0, 10)
     .map(durationOf)
@@ -142,6 +139,38 @@ export default async function ProgressPage() {
     streak++;
     cursor -= 7 * 24 * 3600 * 1000;
   }
+
+  // ----- history rows (workouts link to their summary; activities don't) -----
+  interface HistoryEntry {
+    key: string;
+    date: Date;
+    label: string;
+    detail: string;
+    href?: string;
+  }
+
+  const history: HistoryEntry[] = [
+    ...completed.map((w) => {
+      const dur = durationOf(w);
+      return {
+        key: `w${w.id}`,
+        date: w.finishedAt ?? w.startedAt,
+        label: "Workout",
+        detail: `${sets.filter((s) => s.workoutId === w.id).length} sets${
+          dur !== null ? ` · ${dur} min` : ""
+        }`,
+        href: `/workout/${w.id}/summary`,
+      };
+    }),
+    ...activities.map((a) => ({
+      key: `a${a.id}`,
+      date: a.performedAt,
+      label: `🏸 ${a.name}`,
+      detail: `${a.minutes} min`,
+    })),
+  ]
+    .sort((x, y) => y.date.getTime() - x.date.getTime())
+    .slice(0, 12);
 
   const { units } = profile;
 
@@ -254,32 +283,11 @@ export default async function ProgressPage() {
           <section className="rounded-2xl border border-border-subtle bg-surface p-3">
             <h2 className="mb-2 text-sm font-semibold">History</h2>
             <ul className="flex flex-col gap-2">
-              {[
-                ...completed.map((w) => {
-                  const dur = durationOf(w);
-                  return {
-                    key: `w${w.id}`,
-                    date: w.finishedAt ?? w.startedAt,
-                    label: "Workout",
-                    detail: `${sets.filter((s) => s.workoutId === w.id).length} sets${
-                      dur !== null ? ` · ${dur} min` : ""
-                    }`,
-                  };
-                }),
-                ...activities.map((a) => ({
-                  key: `a${a.id}`,
-                  date: a.performedAt,
-                  label: `🏸 ${a.name}`,
-                  detail: `${a.minutes} min`,
-                })),
-              ]
-                .sort((x, y) => y.date.getTime() - x.date.getTime())
-                .slice(0, 12)
-                .map((e) => (
-                  <li
-                    key={e.key}
-                    className="flex items-baseline justify-between gap-2 text-sm"
-                  >
+              {history.map((e) => {
+                const rowClass =
+                  "flex items-baseline justify-between gap-2 text-sm";
+                const row = (
+                  <>
                     <span className="min-w-0 truncate">
                       {e.date.toLocaleDateString("en-US", {
                         weekday: "short",
@@ -291,8 +299,20 @@ export default async function ProgressPage() {
                     <span className="shrink-0 text-xs text-muted">
                       {e.detail}
                     </span>
+                  </>
+                );
+                return (
+                  <li key={e.key}>
+                    {e.href ? (
+                      <Link href={e.href} className={rowClass}>
+                        {row}
+                      </Link>
+                    ) : (
+                      <div className={rowClass}>{row}</div>
+                    )}
                   </li>
-                ))}
+                );
+              })}
             </ul>
           </section>
         </>
