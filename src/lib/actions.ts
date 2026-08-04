@@ -12,7 +12,13 @@ import {
 } from "./adapt";
 import { exercises, getExercise, gifUrl, imageUrl } from "./exercises";
 import { generatePlan } from "./generator";
-import { getNextSession, getProfile } from "./data";
+import {
+  getActivePlanDays,
+  getNextSession,
+  getProfile,
+  type PlanDayRow,
+  type WorkoutRow,
+} from "./data";
 import type { PlanExercise, Profile, SkipDecision } from "./types";
 
 async function savePlan(profile: Profile, seed: number) {
@@ -70,18 +76,16 @@ export async function regeneratePlan() {
   revalidatePath("/plan");
 }
 
-export async function startWorkout(targetMinutes: number | null) {
+/** Create the in-progress session row for a plan day; returns its workout id. */
+async function beginSession(
+  planDay: PlanDayRow,
+  pendingFold: WorkoutRow | null,
+  targetMinutes: number | null
+): Promise<number> {
   const db = await getDb();
-  const next = await getNextSession();
-  if (!next) redirect("/onboarding");
-  if (next.inProgress) redirect(`/workout/${next.inProgress.id}`);
-
-  let sessionExercises: PlanExercise[] = next.planDay.exercises;
-  if (next.pendingFold) {
-    sessionExercises = foldIntoSession(
-      sessionExercises,
-      next.pendingFold.exercises
-    );
+  let sessionExercises: PlanExercise[] = planDay.exercises;
+  if (pendingFold) {
+    sessionExercises = foldIntoSession(sessionExercises, pendingFold.exercises);
   }
   if (targetMinutes && targetMinutes < estimateMinutes(sessionExercises)) {
     sessionExercises = compressSession(sessionExercises, targetMinutes);
@@ -90,21 +94,69 @@ export async function startWorkout(targetMinutes: number | null) {
   const [workout] = await db
     .insert(schema.workouts)
     .values({
-      planDayId: next.planDay.id,
+      planDayId: planDay.id,
       exercises: sessionExercises,
       status: "in_progress",
       targetMinutes,
     })
     .returning();
 
-  if (next.pendingFold) {
+  if (pendingFold) {
     await db
       .update(schema.workouts)
       .set({ foldedInto: workout.id })
-      .where(eq(schema.workouts.id, next.pendingFold.id));
+      .where(eq(schema.workouts.id, pendingFold.id));
   }
+  return workout.id;
+}
+
+export async function startWorkout(targetMinutes: number | null) {
+  const next = await getNextSession();
+  if (!next) redirect("/onboarding");
+  if (next.inProgress) redirect(`/workout/${next.inProgress.id}`);
+
+  const workoutId = await beginSession(
+    next.planDay,
+    next.pendingFold,
+    targetMinutes
+  );
   revalidatePath("/");
-  redirect(`/workout/${workout.id}`);
+  redirect(`/workout/${workoutId}`);
+}
+
+/**
+ * Train a different plan day than the one prescribed — for when the prescribed
+ * session doesn't suit how you feel. The prescribed day is set aside with a
+ * "shift" so it comes back next: swapping trades the order, it doesn't cost
+ * you the session.
+ */
+export async function swapSession(planDayId: number) {
+  const db = await getDb();
+  const next = await getNextSession();
+  if (!next) redirect("/onboarding");
+  if (next.inProgress) redirect(`/workout/${next.inProgress.id}`);
+
+  const chosen = (await getActivePlanDays()).find((d) => d.id === planDayId);
+  // reachable: the plan can be regenerated while the swap sheet sits open
+  if (!chosen) redirect("/");
+
+  if (chosen.id !== next.planDay.id) {
+    // Written BEFORE the new session on purpose: history is ordered by id, and
+    // the pending-shift rule asks whether this position was completed *after*
+    // the shift. Reversing these two inserts would answer that wrongly.
+    await db.insert(schema.workouts).values({
+      planDayId: next.planDay.id,
+      exercises: next.planDay.exercises,
+      status: "skipped",
+      skipDecision: "shift",
+      finishedAt: new Date(),
+    });
+  }
+
+  // full length: the short-session options stay with the prescribed session
+  const workoutId = await beginSession(chosen, next.pendingFold, null);
+  revalidatePath("/");
+  redirect(`/workout/${workoutId}`);
 }
 
 export async function skipNextSession(decision: SkipDecision) {
