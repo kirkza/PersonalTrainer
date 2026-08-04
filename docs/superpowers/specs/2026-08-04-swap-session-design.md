@@ -62,20 +62,34 @@ else leaves it pending. When several are pending, the earliest wins — the day 
 have been putting off longest comes first.
 
 ```ts
+/**
+ * Has a shifted-aside day been dealt with? Training it clears it, and so does
+ * dropping or folding it — those are the user saying "move on". Positions are
+ * compared wrapped, because that is how the day was offered.
+ */
+function shiftResolved(
+  shift: SessionHistoryEntry,
+  later: SessionHistoryEntry[],
+  dayCount: number
+): boolean {
+  const offered = shift.position % dayCount;
+  return later.some(
+    (x) =>
+      x.position % dayCount === offered &&
+      (x.status === "completed" ||
+        (x.status === "skipped" && x.skipDecision !== "shift"))
+  );
+}
+
 export function nextPosition(
   dayCount: number,
   history: SessionHistoryEntry[]
 ): number {
-  // A day shifted aside stays next until it's actually trained. Otherwise
-  // "do this session next time I train" is forgotten the moment you train
-  // anything else — and a swapped-away day would vanish for a whole cycle.
   const pending = history.find(
     (h, i) =>
       h.status === "skipped" &&
       h.skipDecision === "shift" &&
-      !history
-        .slice(i + 1)
-        .some((x) => x.status === "completed" && x.position === h.position)
+      !shiftResolved(h, history.slice(i + 1), dayCount)
   );
   if (pending) return pending.position % dayCount;
 
@@ -90,9 +104,19 @@ export function nextPosition(
 
 The old shift branch inside the loop is deleted, not merely bypassed: a shift
 that reaches the loop is either pending — and so already returned above — or
-non-pending, which is only possible when a `completed` entry for its position
-follows it, meaning it cannot be the first entry the loop meets. The branch is
-unreachable once the pending check exists.
+resolved, which requires a later entry for that same wrapped position, and that
+entry is nearer the end of the array, so the backward loop reaches it first. The
+branch is unreachable once the pending check exists.
+
+**Why the comparison must be wrapped on both sides.** An earlier draft of this
+spec compared raw positions while returning a wrapped one. That let a shift
+recorded under a longer plan become permanently unclearable: with `dayCount = 4`
+a shift at position 5 is offered as `5 % 4 = 1`, training it records a
+`completed` entry at position 1, and a raw comparison against 5 never matches
+again — so the shift stayed pending forever and the sequence pointer died. It is
+reachable simply by reducing `daysPerWeek` and regenerating, and invisible from
+the UI, since shift rows are never displayed. Both sides are wrapped for that
+reason, and `nextPosition` has a regression test for it.
 
 **How this composes with `chooseNextPosition`.** `nextPosition` supplies the
 starting point; the muscle-recovery check still gets to rotate past it. So a
