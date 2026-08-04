@@ -1,4 +1,7 @@
 import raw from "@/data/exercises.slim.json";
+import { TARGET_OVERRIDES, isSelectable } from "./exercise-overrides";
+
+export { isSelectable };
 
 export interface Exercise {
   id: string;
@@ -15,9 +18,21 @@ export interface Exercise {
 export const MEDIA_BASE =
   "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/";
 
-export const exercises = raw as Exercise[];
+/** Every row, corrections applied but nothing filtered out. */
+export const rawExercises: Exercise[] = (raw as Exercise[]).map((e) => {
+  const target = TARGET_OVERRIDES[e.id];
+  return target ? { ...e, target } : e;
+});
 
-const byId = new Map(exercises.map((e) => [e.id, e]));
+/**
+ * Rows the generator and the swap sheet may choose from. Narrower than
+ * `rawExercises`: see `exercise-overrides.ts` for what is held back and why.
+ */
+export const exercises = rawExercises.filter(isSelectable);
+
+// keyed on every row, not just selectable ones — plans and logged sets saved
+// before a row was blocklisted must still render
+const byId = new Map(rawExercises.map((e) => [e.id, e]));
 
 export function getExercise(id: string): Exercise | undefined {
   return byId.get(id);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { generatePlan } from "./generator";
 import { estimateMinutes } from "./adapt";
-import { exercises, getExercise } from "./exercises";
+import { exercises, getExercise, type Exercise } from "./exercises";
 import type { Profile } from "./types";
 
 const base: Profile = {
@@ -127,5 +127,58 @@ describe("generatePlan", () => {
       5
     );
     expect(plan.map((d) => d.focus)).toEqual(["Full Body A", "Full Body B"]);
+  });
+
+  it("never programs a stretch or a muscle-named junk row", () => {
+    for (let seed = 1; seed <= 25; seed++) {
+      const plan = generatePlan(base, exercises, seed);
+      for (const pe of plan.flatMap((d) => d.exercises)) {
+        const ex = getExercise(pe.exerciseId)!;
+        expect(ex.name).not.toMatch(/\b(stretch|stretches|mobility|pose)\b/i);
+        expect(ex.name).not.toBe(ex.target);
+      }
+    }
+  });
+
+  it("fills every slot of the template it can", () => {
+    // a blocklist that emptied a muscle's pool would silently drop slots
+    const plan = generatePlan({ ...base, daysPerWeek: 6 }, exercises, 11);
+    for (const day of plan) {
+      expect(day.exercises.length).toBeGreaterThanOrEqual(5);
+    }
+  });
+
+  it("does not pick accessories by name length", () => {
+    // the old scoring subtracted 0.12 per character, which pinned selection to
+    // the shortest name in the pool — and rewarded degenerate rows most of all
+    // needs more candidates than the top-N window, or every row is reachable
+    const pool: Exercise[] = [
+      "ab",
+      "abcd",
+      "abcdef gh",
+      "abcdefgh ijklmn",
+      "abcdefgh ijklmn opqrst",
+      "abcdefgh ijklmn opqrst uvwxyz abcd",
+    ].map((name, i) => ({
+      id: `x${i}`,
+      name,
+      bodyPart: "upper legs",
+      equipment: "dumbbell",
+      target: "quads",
+      secondaryMuscles: [],
+      image: "",
+      gifUrl: "",
+      steps: [],
+    }));
+    const picked = new Set<string>();
+    for (let seed = 1; seed <= 60; seed++) {
+      const plan = generatePlan(
+        { ...base, daysPerWeek: 4, equipment: ["dumbbell"] },
+        pool,
+        seed
+      );
+      for (const pe of plan.flatMap((d) => d.exercises)) picked.add(pe.exerciseId);
+    }
+    expect(picked.size).toBe(pool.length);
   });
 });

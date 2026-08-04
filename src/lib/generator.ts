@@ -102,6 +102,20 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/**
+ * Version suffixes, demo-angle notes and gear qualifiers mark a row as a
+ * variation rather than the canonical lift: "v. 2", "(male)", "(side pov)",
+ * "(with rope attachment)". Nudging these down replaces an earlier penalty on
+ * raw name length, which ranked by character count and so favoured the
+ * dataset's degenerate rows — the one literally named "quads" scored highest of
+ * all the quads exercises.
+ */
+const VARIANT_MARKER = /\(|\bv\.\s*\d|\bversion\b/i;
+
+function variantPenalty(name: string): number {
+  return VARIANT_MARKER.test(name) ? -2 : 0;
+}
+
 const FINISHER_MINUTES = 10;
 
 /** Pick a cardio exercise, preferring the user's gear and plan-wide variety. */
@@ -119,7 +133,7 @@ function pickCardio(
       score:
         equipmentRank(e.equipment) +
         (usedInPlan.has(e.id) ? -8 : 0) +
-        -0.12 * e.name.length +
+        variantPenalty(e.name) +
         rand() * 2,
     }))
     .sort((a, b) => b.score - a.score);
@@ -174,8 +188,7 @@ export function generatePlan(
             (families(e.name).some((f) => dayFamilies.has(f)) ? -6 : 0) +
             // nudge toward equipment variety within a session
             -0.75 * dayEquipment.filter((q) => q === e.equipment).length +
-            // canonical lifts have short names; exotic variations are long
-            -0.12 * e.name.length +
+            variantPenalty(e.name) +
             rand() * 2,
         }))
         .sort((a, b) => b.score - a.score);
