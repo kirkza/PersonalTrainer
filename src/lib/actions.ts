@@ -176,7 +176,7 @@ export async function finishWorkout(workoutId: number) {
     .where(eq(schema.workouts.id, workoutId));
   revalidatePath("/");
   revalidatePath("/progress");
-  redirect("/");
+  redirect(`/workout/${workoutId}/summary`);
 }
 
 export async function discardWorkout(workoutId: number) {
