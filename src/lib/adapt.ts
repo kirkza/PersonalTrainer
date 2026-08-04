@@ -68,21 +68,32 @@ export interface SessionHistoryEntry {
 
 /**
  * Which plan day comes next by sequence alone? Sessions run in order;
- * completing (or dropping/folding a skipped) session advances the pointer,
- * while a session skipped with "shift" stays next — the whole week slides
- * instead. Positions are wrapped, so history from a longer plan still lands
- * inside the current one.
+ * completing (or dropping/folding a skipped) session advances the pointer.
+ * A session skipped with "shift" stays next until that day is actually
+ * trained, so the week slides rather than losing the session. Positions are
+ * wrapped, so history from a longer plan still lands inside the current one.
  */
 export function nextPosition(
   dayCount: number,
   history: SessionHistoryEntry[]
 ): number {
+  // A day shifted aside stays next until it's actually trained. Without this,
+  // "do this session next time I train" is forgotten the moment you train
+  // anything else — and a swapped-away day would vanish for a whole cycle.
+  // Earliest pending shift first: the day put off longest comes back first.
+  const pending = history.find(
+    (h, i) =>
+      h.status === "skipped" &&
+      h.skipDecision === "shift" &&
+      !history
+        .slice(i + 1)
+        .some((x) => x.status === "completed" && x.position === h.position)
+  );
+  if (pending) return pending.position % dayCount;
+
   for (let i = history.length - 1; i >= 0; i--) {
     const h = history[i];
     if (h.status === "in_progress") continue;
-    if (h.status === "skipped" && h.skipDecision === "shift") {
-      return h.position % dayCount;
-    }
     return (h.position + 1) % dayCount;
   }
   return 0;

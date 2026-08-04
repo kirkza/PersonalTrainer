@@ -129,6 +129,44 @@ describe("nextPosition", () => {
       ])
     ).toBe(1);
   });
+
+  it("keeps a shifted session next even after another one is trained", () => {
+    expect(
+      nextPosition(4, [
+        { position: 1, status: "skipped", skipDecision: "shift" },
+        { position: 2, status: "completed" },
+      ])
+    ).toBe(1);
+  });
+
+  it("releases a shifted session once it has been trained", () => {
+    expect(
+      nextPosition(4, [
+        { position: 1, status: "skipped", skipDecision: "shift" },
+        { position: 2, status: "completed" },
+        { position: 1, status: "completed" },
+      ])
+    ).toBe(2);
+  });
+
+  it("offers the longest-outstanding session when two are shifted", () => {
+    expect(
+      nextPosition(4, [
+        { position: 0, status: "skipped", skipDecision: "shift" },
+        { position: 1, status: "skipped", skipDecision: "shift" },
+        { position: 2, status: "completed" },
+      ])
+    ).toBe(0);
+  });
+
+  it("holds the shifted session while its own workout is in progress", () => {
+    expect(
+      nextPosition(4, [
+        { position: 1, status: "skipped", skipDecision: "shift" },
+        { position: 1, status: "in_progress" },
+      ])
+    ).toBe(1);
+  });
 });
 
 // ---- muscle-recovery aware scheduling -------------------------------------
