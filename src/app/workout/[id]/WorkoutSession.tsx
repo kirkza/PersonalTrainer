@@ -10,6 +10,7 @@ import {
   swapInWorkout,
 } from "@/lib/actions";
 import type { SessionExerciseView } from "@/lib/data";
+import { canRemoveLastRow } from "@/lib/set-rows";
 import ExerciseGif from "@/components/ExerciseGif";
 import RestTimer, {
   maybeRequestNotifications,
@@ -242,6 +243,10 @@ function ExerciseCard({
     startTransition(() => deleteSet(id));
   };
 
+  /** Take back an accidental "+ Add set". Never drops a logged set. */
+  const removeLastRow = () =>
+    setRows((r) => (canRemoveLastRow(r, ex.sets) ? r.slice(0, -1) : r));
+
   const doneCount = rows.filter((r) => r.id !== null).length;
 
   return (
@@ -328,21 +333,32 @@ function ExerciseCard({
             )}
           </div>
         ))}
-        <button
-          onClick={() =>
-            setRows((r) => [
-              ...r,
-              {
-                id: null,
-                reps: r.at(-1)?.reps ?? String(ex.repsHigh),
-                weight: r.at(-1)?.weight ?? "",
-              },
-            ])
-          }
-          className="self-start pl-7 text-xs text-muted"
-        >
-          + Add set
-        </button>
+        <div className="flex items-center gap-4 pl-7">
+          <button
+            onClick={() =>
+              setRows((r) => [
+                ...r,
+                {
+                  id: null,
+                  reps: r.at(-1)?.reps ?? String(ex.repsHigh),
+                  weight: r.at(-1)?.weight ?? "",
+                },
+              ])
+            }
+            className="text-xs text-muted"
+          >
+            + Add set
+          </button>
+          {canRemoveLastRow(rows, ex.sets) && (
+            <button
+              onClick={removeLastRow}
+              className="text-xs text-danger"
+              aria-label="Remove the set you just added"
+            >
+              − Remove set
+            </button>
+          )}
+        </div>
       </div>
 
       {doneCount >= ex.sets && (
