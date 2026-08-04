@@ -97,10 +97,13 @@ merely the first time it is next in line. On a full-body plan, where every day
 overlaps every other, the sequence pointer wins and you get the day straight
 back.
 
-**Behavior change to confirm, not assume.** This alters `skipNextSession("shift")`
-too — a shifted day now survives training something else. Any existing test that
-encodes the forgetting behavior is asserting a bug and gets updated deliberately,
-with the change called out.
+**Behavior change, verified against the existing suite.** This alters
+`skipNextSession("shift")` too — a shifted day now survives training something
+else. All six existing `nextPosition` tests and all seven `chooseNextPosition`
+tests were traced against the new rule and still hold: none of them exercises a
+shift followed by a completed session, which is precisely why the bug survived.
+So no existing test needs changing, and no existing assertion is being weakened
+to accommodate this.
 
 ### Action — `src/lib/actions.ts`
 
@@ -153,7 +156,8 @@ prescribed day:
 `muscles` is `[...sessionMuscles(d.exercises)]` truncated to the first three.
 `sessionMuscles` returns each exercise's `target`, so these are dataset target
 names (`pectorals`, `lats`, `quads`) rather than colloquial body parts — the row
-shows them verbatim, lowercase, joined with `·`. Set iteration follows insertion
+joins them with `·` under a `capitalize` class, matching how the app already
+renders target names on the session screen. Set iteration follows insertion
 order, so "first three" means the first three distinct targets in the day's
 exercise order, which is stable across renders. `estimate` is
 `estimateMinutes(d.exercises)`.
