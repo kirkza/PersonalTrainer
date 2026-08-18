@@ -1,5 +1,6 @@
 import { compressSession, equipmentRank } from "./adapt";
 import type { Exercise } from "./exercises";
+import { isCompound, movementFamilies as families } from "./movement";
 import type { GeneratedDay, PlanExercise, Profile } from "./types";
 
 /** Muscle slots per session, in execution order. First two slots are primaries. */
@@ -26,45 +27,6 @@ const SPLITS: Record<number, string[]> = {
   5: ["Push A", "Pull A", "Legs A", "Upper A", "Lower A"],
   6: ["Push A", "Pull A", "Legs A", "Push B", "Pull B", "Legs B"],
 };
-
-const COMPOUND_PATTERNS = [
-  /\bsquat\b/,
-  /deadlift/,
-  /bench press/,
-  /(overhead|shoulder|military) press/,
-  /\brow\b/,
-  /pull-?up|chin-?up|pull-?down/,
-  /lunge/,
-  /hip thrust/,
-  /\bdips?\b/,
-  /\bpress\b/,
-];
-
-function isCompound(name: string): boolean {
-  return COMPOUND_PATTERNS.some((p) => p.test(name));
-}
-
-const FAMILY_KEYWORDS = [
-  "squat",
-  "deadlift",
-  "bench press",
-  "pulldown",
-  "pull-up",
-  "pullup",
-  "chin-up",
-  "row",
-  "curl",
-  "press",
-  "raise",
-  "extension",
-  "fly",
-  "crunch",
-  "lunge",
-];
-
-function families(name: string): string[] {
-  return FAMILY_KEYWORDS.filter((k) => name.includes(k));
-}
 
 interface RepScheme {
   sets: number;
