@@ -10,6 +10,7 @@ import {
   type SessionHistoryEntry,
 } from "./adapt";
 import { exercises } from "./exercises";
+import { modifiers, withoutModifier } from "./movement";
 import type { PlanExercise } from "./types";
 
 const pe = (
@@ -317,14 +318,25 @@ describe("foldIntoSession", () => {
 });
 
 describe("alternativesFor", () => {
+  const GYM = [
+    "barbell",
+    "dumbbell",
+    "cable",
+    "body weight",
+    "leverage machine",
+    "ez barbell",
+    "smith machine",
+  ];
+  const byName = (name: string) => exercises.find((e) => e.name === name)!;
+
   it("returns exercises targeting the same muscle, excluding the original", () => {
-    const squat = exercises.find((e) => e.name === "barbell full squat")!;
+    const squat = byName("barbell full squat");
     const alts = alternativesFor(squat.id, ["dumbbell", "body weight"], 10);
     expect(alts.length).toBeGreaterThan(0);
     for (const alt of alts) {
-      expect(alt.id).not.toBe(squat.id);
-      expect(alt.target).toBe(squat.target);
-      expect(["dumbbell", "body weight"]).toContain(alt.equipment);
+      expect(alt.exercise.id).not.toBe(squat.id);
+      expect(alt.exercise.target).toBe(squat.target);
+      expect(["dumbbell", "body weight"]).toContain(alt.exercise.equipment);
     }
   });
 
@@ -334,8 +346,100 @@ describe("alternativesFor", () => {
     const alts = alternativesFor(rare.id, ["tire"], 10);
     expect(alts.length).toBeGreaterThan(0);
     for (const alt of alts) {
-      expect(alt.target).toBe("adductors");
-      expect(alt.equipment).not.toBe("tire");
+      expect(alt.exercise.target).toBe("adductors");
+      expect(alt.exercise.equipment).not.toBe("tire");
     }
+  });
+
+  it("tells the options apart instead of repeating the equipment tag", () => {
+    const alts = alternativesFor(byName("barbell bench press").id, GYM, 12);
+    // a bench press swap is all pressing, so it is one group
+    expect(alts.every((a) => a.samePattern)).toBe(true);
+    // and the difference lines actually differ from one another
+    const details = alts.map((a) => a.detail);
+    expect(new Set(details).size).toBeGreaterThan(details.length / 2);
+    expect(details).toContain("incline");
+    expect(details).toContain("decline");
+  });
+
+  it("names the equipment first when the substitute uses different gear", () => {
+    const alts = alternativesFor(byName("barbell bench press").id, GYM, 12);
+    for (const a of alts) {
+      if (a.exercise.equipment !== "barbell") {
+        expect(a.detail.startsWith(a.exercise.equipment)).toBe(true);
+      }
+    }
+    expect(
+      alts.find((a) => a.exercise.name === "dumbbell bench press")?.detail
+    ).toBe("dumbbell");
+    // two differences at once read as one line
+    expect(
+      alts.find((a) => a.exercise.name === "barbell decline wide-grip press")
+        ?.detail
+    ).toBe("decline · wide grip");
+  });
+
+  it("drops camera-angle re-shoots and repeats of the same lift", () => {
+    const alts = alternativesFor(byName("barbell full squat").id, GYM, 12);
+    const names = alts.map((a) => a.exercise.name);
+    expect(names.some((n) => /pov\)/.test(n))).toBe(false);
+    expect(names.some((n) => /\bv\.? ?\d\b/.test(n))).toBe(false);
+    const canonical = names.map((n) => n.replace(/\s*\([^)]*\)/g, "").trim());
+    expect(new Set(canonical).size).toBe(canonical.length);
+  });
+
+  it("keeps true variants above a different movement direction", () => {
+    const alts = alternativesFor(byName("dumbbell lateral raise").id, GYM, 12);
+    // swapping a lateral raise should not open with a barbell front raise
+    expect(alts[0].exercise.equipment).toBe("dumbbell");
+    const firstFrontRaise = alts.findIndex((a) =>
+      /front/.test(a.exercise.name)
+    );
+    if (firstFrontRaise >= 0) expect(firstFrontRaise).toBeGreaterThan(0);
+  });
+
+  it("puts same-movement options above ones that feel different", () => {
+    const pushdown = exercises.find(
+      (e) => e.target === "triceps" && /pushdown/.test(e.name)
+    )!;
+    const alts = alternativesFor(pushdown.id, GYM, 12);
+    // triceps has both pushdowns and extensions/presses, so the split is real
+    expect(alts.some((a) => a.samePattern)).toBe(true);
+    expect(alts.some((a) => !a.samePattern)).toBe(true);
+    const firstOther = alts.findIndex((a) => !a.samePattern);
+    expect(alts.slice(0, firstOther).every((a) => a.samePattern)).toBe(true);
+    expect(alts.slice(firstOther).every((a) => !a.samePattern)).toBe(true);
+  });
+
+  it("does not label every option with the same missing modifier", () => {
+    // a different movement drops the original's modifier by definition, so
+    // "no incline" on every row would be noise rather than a difference
+    const incline = exercises.find((e) =>
+      /^cable incline pushdown/.test(e.name)
+    );
+    if (!incline) return;
+    const negations = modifiers(incline.name).map(withoutModifier);
+    const details = alternativesFor(incline.id, GYM, 12)
+      .filter((a) => !a.samePattern)
+      .map((a) => a.detail);
+    expect(details.length).toBeGreaterThan(0);
+    for (const d of details) expect(negations).not.toContain(d);
+  });
+
+  it("words a missing modifier so it reads as English", () => {
+    const oneArm = exercises.find(
+      (e) => e.target === "triceps" && /one arm.*pushdown/.test(e.name)
+    )!;
+    const alts = alternativesFor(oneArm.id, GYM, 12);
+    const bothArms = alts.find((a) => a.exercise.name === "cable pushdown");
+    // not "no one side at a time"
+    expect(bothArms?.detail).toBe("both at once");
+  });
+
+  it("falls back to the equipment when nothing else distinguishes it", () => {
+    const alts = alternativesFor(byName("barbell full squat").id, GYM, 12);
+    const zercher = alts.find((a) => /zercher/.test(a.exercise.name));
+    // the name itself carries the difference, so no invented filler text
+    expect(zercher?.detail).toBe("barbell");
   });
 });

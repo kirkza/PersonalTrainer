@@ -1,4 +1,11 @@
 import { exercises, getExercise, type Exercise } from "./exercises";
+import {
+  canonicalName,
+  isDuplicateShot,
+  modifiers,
+  movementFamilies,
+  withoutModifier,
+} from "./movement";
 import type { PlanExercise, SkipDecision, WorkoutStatus } from "./types";
 
 /** Rough session time model: 5 min warm-up + ~3 min per set including rest;
@@ -226,16 +233,72 @@ export function equipmentRank(equipment: string): number {
   return EQUIPMENT_RANK[equipment] ?? 0;
 }
 
+export interface Alternative {
+  exercise: Exercise;
+  /** shares the original's movement pattern — press, squat, row, curl … */
+  samePattern: boolean;
+  /** how this one differs from the original, e.g. "dumbbell · incline" */
+  detail: string;
+}
+
 /**
- * Substitutes for an exercise: same target muscle, ranked by matching the
- * user's gym equipment, same body part, and sturdier equipment. Falls back
- * to all equipment when the user's gear can't hit that muscle.
+ * How a candidate differs from the exercise it would replace: the equipment
+ * when it changes, then whatever the name says about angle, grip or stance.
+ * Same-target substitutes are near-identical on every similarity measure, so
+ * what helps someone choose is the difference, not the resemblance.
+ */
+function differenceFrom(
+  original: Exercise,
+  candidate: Exercise,
+  samePattern: boolean
+): string {
+  const bits: string[] = [];
+  if (candidate.equipment !== original.equipment) bits.push(candidate.equipment);
+
+  const originalMods = modifiers(original.name);
+  const candidateMods = modifiers(candidate.name);
+  bits.push(...candidateMods.filter((m) => !originalMods.includes(m)));
+
+  // "no incline" only reads as the difference on the same movement. Against a
+  // different one it is true of every candidate at once, which says nothing.
+  if (bits.length === 0 && samePattern) {
+    const dropped = originalMods.filter((m) => !candidateMods.includes(m));
+    if (dropped.length > 0) bits.push(withoutModifier(dropped[0]));
+  }
+  // nothing detectable left: the name itself carries the difference
+  // ("zercher", "jefferson"), so don't invent filler text for it
+  if (bits.length === 0) return candidate.equipment;
+  return bits.slice(0, 2).join(" · ");
+}
+
+/**
+ * Drop the dataset's camera-angle re-shoots, and keep only one row per lift —
+ * the best-ranked one, so callers must sort before de-duplicating.
+ */
+function dedupeVariants(ranked: Exercise[], original: Exercise): Exercise[] {
+  const seen = new Set([canonicalName(original.name)]);
+  const out: Exercise[] = [];
+  for (const e of ranked) {
+    if (isDuplicateShot(e.name)) continue;
+    const key = canonicalName(e.name);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(e);
+  }
+  return out;
+}
+
+/**
+ * Substitutes for an exercise: same target muscle, preferring the user's gym
+ * equipment, then the closest movement — same pattern first, then the same
+ * gear, then the fewest changes to grip or angle. Falls back to all equipment
+ * when the user's gear can't hit that muscle.
  */
 export function alternativesFor(
   exerciseId: string,
   equipment: string[],
   limit = 10
-): Exercise[] {
+): Alternative[] {
   const original = getExercise(exerciseId);
   if (!original) return [];
   const sameTarget = exercises.filter(
@@ -243,13 +306,33 @@ export function alternativesFor(
   );
   const withGear = sameTarget.filter((e) => equipment.includes(e.equipment));
   const pool = withGear.length > 0 ? withGear : sameTarget;
-  return pool
-    .map((e) => ({
-      e,
-      score:
-        (e.bodyPart === original.bodyPart ? 4 : 0) + equipmentRank(e.equipment),
-    }))
-    .sort((a, b) => b.score - a.score || a.e.name.localeCompare(b.e.name))
+
+  const originalFamilies = movementFamilies(original.name);
+  const originalMods = modifiers(original.name);
+  const samePattern = (e: Exercise) =>
+    movementFamilies(e.name).some((f) => originalFamilies.includes(f));
+  const changes = (e: Exercise) =>
+    modifiers(e.name).filter((m) => !originalMods.includes(m)).length;
+
+  const ranked = [...pool].sort(
+    (a, b) =>
+      Number(samePattern(b)) - Number(samePattern(a)) ||
+      Number(b.equipment === original.equipment) -
+        Number(a.equipment === original.equipment) ||
+      changes(a) - changes(b) ||
+      Number(b.bodyPart === original.bodyPart) -
+        Number(a.bodyPart === original.bodyPart) ||
+      // canonical lifts have short names; exotic variations are long
+      a.name.length - b.name.length ||
+      equipmentRank(b.equipment) - equipmentRank(a.equipment) ||
+      a.name.localeCompare(b.name)
+  );
+
+  return dedupeVariants(ranked, original)
     .slice(0, limit)
-    .map((x) => x.e);
+    .map((e) => ({
+      exercise: e,
+      samePattern: samePattern(e),
+      detail: differenceFrom(original, e, samePattern(e)),
+    }));
 }

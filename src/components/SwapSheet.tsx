@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { getAlternatives, type AlternativeView } from "@/lib/actions";
 import ExerciseGif from "./ExerciseGif";
 
@@ -39,8 +39,8 @@ export default function SwapSheet({
               Swap <span className="capitalize">{exerciseName}</span>
             </h3>
             <p className="mb-3 text-xs text-muted">
-              Same target muscle, matched to your gym&apos;s equipment · tap a
-              picture to preview it
+              Same target muscle, matched to your gym&apos;s equipment · each
+              one says how it differs · tap a picture to preview it
             </p>
             {alts === null ? (
               <p className="py-8 text-center text-sm text-muted">Loading…</p>
@@ -50,33 +50,46 @@ export default function SwapSheet({
               </p>
             ) : (
               <ul className="flex flex-col gap-2">
-                {alts.map((a) => (
-                  <li
-                    key={a.id}
-                    className="flex items-center gap-3 rounded-xl border border-border-subtle bg-surface-2 p-2"
-                  >
-                    {/* separate tap targets: picture previews, name selects */}
-                    <ExerciseGif
-                      imageUrl={a.imageUrl}
-                      gifUrl={a.gifUrl}
-                      name={a.name}
-                      size={56}
-                    />
-                    <button
-                      onClick={() =>
-                        askScope ? setChosen(a) : onPick(a.id, true)
-                      }
-                      className="min-w-0 flex-1 py-2 text-left"
-                    >
-                      <span className="block text-sm font-medium capitalize">
-                        {a.name}
-                      </span>
-                      <span className="text-xs capitalize text-muted">
-                        {a.equipment}
-                      </span>
-                    </button>
-                    <span className="pr-1 text-muted">›</span>
-                  </li>
+                {alts.map((a, i) => (
+                  <Fragment key={a.id}>
+                    {/* the list is sorted, so the group changes at most once */}
+                    {(i === 0 || a.samePattern !== alts[i - 1].samePattern) && (
+                      <li
+                        className={`text-xs font-semibold uppercase tracking-wide text-muted ${
+                          i === 0 ? "" : "mt-2"
+                        }`}
+                      >
+                        {a.samePattern
+                          ? "Closest — same movement"
+                          : "Different feel"}
+                      </li>
+                    )}
+                    <li className="flex items-center gap-3 rounded-xl border border-border-subtle bg-surface-2 p-2">
+                      {/* separate tap targets: picture previews, name selects */}
+                      <ExerciseGif
+                        imageUrl={a.imageUrl}
+                        gifUrl={a.gifUrl}
+                        name={a.name}
+                        size={56}
+                      />
+                      <button
+                        onClick={() =>
+                          askScope ? setChosen(a) : onPick(a.id, true)
+                        }
+                        className="min-w-0 flex-1 py-2 text-left"
+                      >
+                        <span className="block text-sm font-medium capitalize">
+                          {a.name}
+                        </span>
+                        {/* not `capitalize`: it would title-case phrases
+                            like "one side at a time" */}
+                        <span className="text-xs text-muted first-letter:uppercase">
+                          {a.detail}
+                        </span>
+                      </button>
+                      <span className="pr-1 text-muted">›</span>
+                    </li>
+                  </Fragment>
                 ))}
               </ul>
             )}

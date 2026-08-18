@@ -247,6 +247,10 @@ export interface AlternativeView {
   target: string;
   gifUrl: string;
   imageUrl: string;
+  /** shares the original's movement pattern, so it belongs in "closest" */
+  samePattern: boolean;
+  /** how it differs from the exercise being replaced */
+  detail: string;
 }
 
 export async function getAlternatives(
@@ -254,13 +258,15 @@ export async function getAlternatives(
 ): Promise<AlternativeView[]> {
   const profile = await getProfile();
   const alts = alternativesFor(exerciseId, profile?.equipment ?? [], 12);
-  return alts.map((e) => ({
-    id: e.id,
-    name: e.name,
-    equipment: e.equipment,
-    target: e.target,
-    gifUrl: gifUrl(e),
-    imageUrl: imageUrl(e),
+  return alts.map((a) => ({
+    id: a.exercise.id,
+    name: a.exercise.name,
+    equipment: a.exercise.equipment,
+    target: a.exercise.target,
+    gifUrl: gifUrl(a.exercise),
+    imageUrl: imageUrl(a.exercise),
+    samePattern: a.samePattern,
+    detail: a.detail,
   }));
 }
 
