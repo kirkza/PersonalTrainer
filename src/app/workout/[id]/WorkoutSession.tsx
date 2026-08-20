@@ -93,12 +93,22 @@ function ExerciseNote({
   const [current, setCurrent] = useState(note);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note ?? "");
+  const [failed, setFailed] = useState(false);
   const [, startTransition] = useTransition();
 
   const save = () => {
+    const previous = current;
     setCurrent(normalizeNote(draft));
     setEditing(false);
-    startTransition(() => saveExerciseNote(exerciseId, draft));
+    setFailed(false);
+    startTransition(async () => {
+      const { saved } = await saveExerciseNote(exerciseId, draft);
+      // showing an unsaved note as saved loses it silently on the next refresh
+      if (!saved) {
+        setCurrent(previous);
+        setFailed(true);
+      }
+    });
   };
 
   if (editing) {
@@ -130,6 +140,24 @@ function ExerciseNote({
             Cancel
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (failed) {
+    return (
+      <div className="mt-2 rounded-lg bg-danger/10 px-2 py-1.5 text-xs text-danger">
+        Couldn&apos;t save that note — notes aren&apos;t set up on the server
+        yet.{" "}
+        <button
+          onClick={() => {
+            setFailed(false);
+            setEditing(true);
+          }}
+          className="underline"
+        >
+          Try again
+        </button>
       </div>
     );
   }

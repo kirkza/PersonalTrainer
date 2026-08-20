@@ -328,8 +328,11 @@ export async function swapInPlanDay(
 }
 
 /** Save (or clear, when emptied) the living setup note for an exercise. */
-export async function saveExerciseNote(exerciseId: string, raw: string) {
-  if (!getExercise(exerciseId)) return;
+export async function saveExerciseNote(
+  exerciseId: string,
+  raw: string
+): Promise<{ saved: boolean }> {
+  if (!getExercise(exerciseId)) return { saved: false };
   const db = await getDb();
   const note = normalizeNote(clampNote(raw));
   try {
@@ -346,9 +349,11 @@ export async function saveExerciseNote(exerciseId: string, raw: string) {
           set: { note, updatedAt: new Date() },
         });
     }
+    return { saved: true };
   } catch (err) {
-    // same hand-applied-migration lag as notesFor: losing one note beats
-    // crashing the set-logging screen
+    // same hand-applied-migration lag as notesFor: the screen must not crash,
+    // but the caller has to know the note is gone rather than show it as saved
     console.error("saveExerciseNote: dropped note", err);
+    return { saved: false };
   }
 }
