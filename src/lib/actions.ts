@@ -12,6 +12,7 @@ import {
 } from "./adapt";
 import { exercises, getExercise, gifUrl, imageUrl } from "./exercises";
 import { generatePlan } from "./generator";
+import { clampNote, normalizeNote } from "./notes";
 import {
   getActivePlanDays,
   getNextSession,
@@ -324,4 +325,24 @@ export async function swapInPlanDay(
     .where(eq(schema.planDays.id, planDayId));
   revalidatePath("/plan");
   revalidatePath("/");
+}
+
+/** Save (or clear, when emptied) the living setup note for an exercise. */
+export async function saveExerciseNote(exerciseId: string, raw: string) {
+  if (!getExercise(exerciseId)) return;
+  const db = await getDb();
+  const note = normalizeNote(clampNote(raw));
+  if (note === null) {
+    await db
+      .delete(schema.exerciseNotes)
+      .where(eq(schema.exerciseNotes.exerciseId, exerciseId));
+  } else {
+    await db
+      .insert(schema.exerciseNotes)
+      .values({ exerciseId, note })
+      .onConflictDoUpdate({
+        target: schema.exerciseNotes.exerciseId,
+        set: { note, updatedAt: new Date() },
+      });
+  }
 }

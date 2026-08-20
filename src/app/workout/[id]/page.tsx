@@ -4,6 +4,7 @@ import {
   getSetsForWorkout,
   getWorkout,
   lastSetsFor,
+  notesFor,
   toExerciseView,
 } from "@/lib/data";
 import { getActivePlanDays } from "@/lib/data";
@@ -25,9 +26,11 @@ export default async function WorkoutPage({
   if (!workout) notFound();
   if (workout.status !== "in_progress") redirect("/");
 
-  const [logged, lastTime, planDays] = await Promise.all([
+  const exerciseIds = workout.exercises.map((e) => e.exerciseId);
+  const [logged, lastTime, notes, planDays] = await Promise.all([
     getSetsForWorkout(workoutId),
-    lastSetsFor(workout.exercises.map((e) => e.exerciseId)),
+    lastSetsFor(exerciseIds),
+    notesFor(exerciseIds),
     getActivePlanDays(),
   ]);
 
@@ -35,7 +38,14 @@ export default async function WorkoutPage({
     planDays.find((d) => d.id === workout.planDayId)?.focus ?? "Workout";
 
   const views = workout.exercises
-    .map((pe) => toExerciseView(pe, logged, lastTime.get(pe.exerciseId) ?? []))
+    .map((pe) =>
+      toExerciseView(
+        pe,
+        logged,
+        lastTime.get(pe.exerciseId) ?? [],
+        notes.get(pe.exerciseId) ?? null
+      )
+    )
     .filter((v) => v !== null);
 
   return (

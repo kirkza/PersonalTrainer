@@ -88,3 +88,13 @@ export const sets = pgTable("sets", {
   durationMin: integer("duration_min"),
   loggedAt: timestamp("logged_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** One living setup note per exercise ("seat height 4, pin 12"), keyed by the
+ *  dataset id so it resurfaces whenever that exercise comes around again. */
+export const exerciseNotes = pgTable("exercise_notes", {
+  exerciseId: text("exercise_id").primaryKey(),
+  note: text("note").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});

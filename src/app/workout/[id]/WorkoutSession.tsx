@@ -7,8 +7,10 @@ import {
   discardWorkout,
   finishWorkout,
   logSet,
+  saveExerciseNote,
   swapInWorkout,
 } from "@/lib/actions";
+import { NOTE_MAX_LENGTH, normalizeNote } from "@/lib/notes";
 import type { SessionExerciseView } from "@/lib/data";
 import { canRemoveLastRow } from "@/lib/set-rows";
 import ExerciseGif from "@/components/ExerciseGif";
@@ -75,6 +77,90 @@ function initialRows(ex: SessionExerciseView): SetRowState[] {
   return rows;
 }
 
+
+/**
+ * The living setup note for an exercise ("seat height 4, pin 12"). Always
+ * visible when present — resurfacing it un-asked is the point — and edited in
+ * place. Saving an emptied note removes it.
+ */
+function ExerciseNote({
+  exerciseId,
+  note,
+}: {
+  exerciseId: string;
+  note: string | null;
+}) {
+  const [current, setCurrent] = useState(note);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(note ?? "");
+  const [, startTransition] = useTransition();
+
+  const save = () => {
+    setCurrent(normalizeNote(draft));
+    setEditing(false);
+    startTransition(() => saveExerciseNote(exerciseId, draft));
+  };
+
+  if (editing) {
+    return (
+      <div className="mt-2 flex flex-col gap-1.5">
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          maxLength={NOTE_MAX_LENGTH}
+          rows={2}
+          autoFocus
+          placeholder="Setup to remember — seat height, pin, attachment…"
+          className="w-full rounded-lg border border-border-subtle bg-surface-2 px-2 py-2 text-sm"
+        />
+        <div className="flex gap-2">
+          <button
+            onClick={save}
+            className="rounded-lg bg-accent-strong px-3 py-1.5 text-xs font-bold text-black"
+          >
+            Save
+          </button>
+          <button
+            onClick={() => {
+              setDraft(current ?? "");
+              setEditing(false);
+            }}
+            className="rounded-lg bg-surface-2 px-3 py-1.5 text-xs text-muted"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (current !== null) {
+    return (
+      <button
+        onClick={() => {
+          setDraft(current);
+          setEditing(true);
+        }}
+        className="mt-2 w-full rounded-lg bg-warning/10 px-2 py-1.5 text-left text-xs text-warning"
+      >
+        📝 {current}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => {
+        setDraft("");
+        setEditing(true);
+      }}
+      className="mt-2 block text-xs text-muted"
+    >
+      + Note
+    </button>
+  );
+}
+
 function CardioCard({
   workoutId,
   ex,
@@ -123,6 +209,8 @@ function CardioCard({
           </div>
         </div>
       </div>
+
+      <ExerciseNote exerciseId={ex.exerciseId} note={ex.note} />
 
       {showSteps && (
         <ol className="mt-3 flex list-decimal flex-col gap-1 pl-5 text-sm text-muted">
@@ -283,6 +371,8 @@ function ExerciseCard({
           </div>
         </div>
       </div>
+
+      <ExerciseNote exerciseId={ex.exerciseId} note={ex.note} />
 
       {showSteps && (
         <ol className="mt-3 flex list-decimal flex-col gap-1 pl-5 text-sm text-muted">

@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { getExercise, gifUrl, imageUrl } from "./exercises";
 import { chooseNextPosition, type SessionHistoryEntry } from "./adapt";
@@ -211,12 +211,15 @@ export interface SessionExerciseView {
     durationMin: number | null;
   }[];
   lastTime: { reps: number; weight: number; durationMin: number | null }[];
+  /** the user's living setup note for this exercise ("seat height 4") */
+  note: string | null;
 }
 
 export function toExerciseView(
   pe: PlanExercise,
   logged: SetRow[],
-  lastTime: { reps: number; weight: number; durationMin: number | null }[]
+  lastTime: { reps: number; weight: number; durationMin: number | null }[],
+  note: string | null
 ): SessionExerciseView | null {
   const ex = getExercise(pe.exerciseId);
   if (!ex) return null;
@@ -243,6 +246,7 @@ export function toExerciseView(
         durationMin: s.durationMin,
       })),
     lastTime,
+    note,
   };
 }
 
@@ -290,4 +294,17 @@ export async function lastSetsFor(
     }
   }
   return result;
+}
+
+/** Living setup notes for a set of exercises, keyed by exercise id. */
+export async function notesFor(
+  exerciseIds: string[]
+): Promise<Map<string, string>> {
+  if (exerciseIds.length === 0) return new Map();
+  const db = await getDb();
+  const rows = await db
+    .select()
+    .from(schema.exerciseNotes)
+    .where(inArray(schema.exerciseNotes.exerciseId, exerciseIds));
+  return new Map(rows.map((r) => [r.exerciseId, r.note]));
 }
