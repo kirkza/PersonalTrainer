@@ -332,17 +332,23 @@ export async function saveExerciseNote(exerciseId: string, raw: string) {
   if (!getExercise(exerciseId)) return;
   const db = await getDb();
   const note = normalizeNote(clampNote(raw));
-  if (note === null) {
-    await db
-      .delete(schema.exerciseNotes)
-      .where(eq(schema.exerciseNotes.exerciseId, exerciseId));
-  } else {
-    await db
-      .insert(schema.exerciseNotes)
-      .values({ exerciseId, note })
-      .onConflictDoUpdate({
-        target: schema.exerciseNotes.exerciseId,
-        set: { note, updatedAt: new Date() },
-      });
+  try {
+    if (note === null) {
+      await db
+        .delete(schema.exerciseNotes)
+        .where(eq(schema.exerciseNotes.exerciseId, exerciseId));
+    } else {
+      await db
+        .insert(schema.exerciseNotes)
+        .values({ exerciseId, note })
+        .onConflictDoUpdate({
+          target: schema.exerciseNotes.exerciseId,
+          set: { note, updatedAt: new Date() },
+        });
+    }
+  } catch (err) {
+    // same hand-applied-migration lag as notesFor: losing one note beats
+    // crashing the set-logging screen
+    console.error("saveExerciseNote: dropped note", err);
   }
 }

@@ -302,9 +302,16 @@ export async function notesFor(
 ): Promise<Map<string, string>> {
   if (exerciseIds.length === 0) return new Map();
   const db = await getDb();
-  const rows = await db
-    .select()
-    .from(schema.exerciseNotes)
-    .where(inArray(schema.exerciseNotes.exerciseId, exerciseIds));
-  return new Map(rows.map((r) => [r.exerciseId, r.note]));
+  try {
+    const rows = await db
+      .select()
+      .from(schema.exerciseNotes)
+      .where(inArray(schema.exerciseNotes.exerciseId, exerciseIds));
+    return new Map(rows.map((r) => [r.exerciseId, r.note]));
+  } catch (err) {
+    // migrations are applied to production by hand, so a deploy can briefly
+    // run ahead of the schema — a session without notes beats a 500 mid-gym
+    console.error("notesFor: falling back to no notes", err);
+    return new Map();
+  }
 }
