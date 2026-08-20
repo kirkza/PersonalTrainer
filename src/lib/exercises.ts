@@ -1,5 +1,9 @@
 import raw from "@/data/exercises.slim.json";
-import { TARGET_OVERRIDES, isSelectable } from "./exercise-overrides";
+import {
+  STEPS_OVERRIDES,
+  TARGET_OVERRIDES,
+  isSelectable,
+} from "./exercise-overrides";
 
 export { isSelectable };
 
@@ -21,7 +25,9 @@ export const MEDIA_BASE =
 /** Every row, corrections applied but nothing filtered out. */
 export const rawExercises: Exercise[] = (raw as Exercise[]).map((e) => {
   const target = TARGET_OVERRIDES[e.id];
-  return target ? { ...e, target } : e;
+  const steps = STEPS_OVERRIDES[e.id];
+  if (!target && !steps) return e;
+  return { ...e, ...(target ? { target } : {}), ...(steps ? { steps } : {}) };
 });
 
 /**

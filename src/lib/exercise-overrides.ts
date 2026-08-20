@@ -67,6 +67,27 @@ export const TARGET_OVERRIDES: Readonly<Record<string, string>> = {
   "3292": "spine", // elevator (was upper back)
 };
 
+/**
+ * Corrected instruction steps, `id: steps`. A row lands here when its steps
+ * describe a different movement than its own picture — the picture is what the
+ * user follows mid-set, so the text is the field that gets rewritten.
+ *
+ * Verified by opening the row's image; the `target` muscle is used to settle
+ * which movement was intended when the two disagree.
+ */
+export const STEPS_OVERRIDES: Readonly<Record<string, string[]>> = {
+  // image shows a supine slider curl — lying on the back, heels sliding out and
+  // back. The original steps described standing on a platform, which is a
+  // different exercise and does not load the hamstrings the row targets.
+  "0730": [
+    "Lie on your back with your heels on the platform or slider and your arms flat at your sides.",
+    "Push your hips up until your weight rests on your shoulders and heels, and hold that bridge.",
+    "Keeping the hips high, slide one heel away from you until the leg is almost straight.",
+    "Pull the heel back in by contracting the hamstring, not by dropping the hips.",
+    "Finish the reps on that leg, then switch. End the set once the hips start to sag.",
+  ],
+};
+
 /** Can this row be prescribed as a working exercise? */
 export function isSelectable(e: { id: string; name: string }): boolean {
   if (EXCLUDED_IDS.has(e.id)) return false;

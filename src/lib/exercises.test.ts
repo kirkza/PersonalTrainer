@@ -6,6 +6,7 @@ import {
   isSelectable,
   rawExercises,
 } from "./exercises";
+import { STEPS_OVERRIDES } from "./exercise-overrides";
 
 describe("selectable pool", () => {
   it("drops rows whose name is just a muscle name", () => {
@@ -60,6 +61,36 @@ describe("selectable pool", () => {
   it("exposes only targets that survive the blocklist", () => {
     for (const t of allTargets) {
       expect(exercises.some((e) => e.target === t)).toBe(true);
+    }
+  });
+});
+
+describe("steps overrides", () => {
+  it("replaces steps that describe a different movement than the picture", () => {
+    const slide = getExercise("0730")!;
+    // the upstream row starts "Start by standing with one foot on a platform"
+    // while its image shows the supine version
+    expect(slide.steps[0]).not.toMatch(/standing/i);
+    expect(slide.steps[0]).toMatch(/lie on your back/i);
+    expect(slide.steps).toHaveLength(5);
+  });
+
+  it("leaves every other field of an overridden row alone", () => {
+    const slide = getExercise("0730")!;
+    expect(slide.name).toBe("single leg platform slide");
+    expect(slide.target).toBe("hamstrings");
+    expect(slide.equipment).toBe("body weight");
+    expect(slide.image).toContain("0730");
+  });
+
+  it("does not touch rows without an override", () => {
+    const bench = getExercise("0025")!;
+    expect(bench.steps[0]).toMatch(/lie flat on a bench/i);
+  });
+
+  it("overrides only ids that exist upstream", () => {
+    for (const id of Object.keys(STEPS_OVERRIDES)) {
+      expect(rawExercises.some((e) => e.id === id)).toBe(true);
     }
   });
 });
