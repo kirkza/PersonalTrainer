@@ -1,5 +1,5 @@
 import { desc, eq, inArray } from "drizzle-orm";
-import { getDb, schema } from "@/db";
+import { getDb, isUndefinedTable, schema } from "@/db";
 import { getExercise, gifUrl, imageUrl } from "./exercises";
 import { chooseNextPosition, type SessionHistoryEntry } from "./adapt";
 import type { PlanExercise, Profile, SkipDecision, WorkoutStatus } from "./types";
@@ -309,9 +309,10 @@ export async function notesFor(
       .where(inArray(schema.exerciseNotes.exerciseId, exerciseIds));
     return new Map(rows.map((r) => [r.exerciseId, r.note]));
   } catch (err) {
-    // migrations are applied to production by hand, so a deploy can briefly
-    // run ahead of the schema — a session without notes beats a 500 mid-gym
-    console.error("notesFor: falling back to no notes", err);
+    // a deploy can briefly run ahead of its migration; a session without notes
+    // beats a 500 mid-gym. Anything other than a missing table is a real fault.
+    if (!isUndefinedTable(err)) throw err;
+    console.error("notesFor: exercise_notes missing, continuing without notes");
     return new Map();
   }
 }

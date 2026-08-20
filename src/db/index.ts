@@ -30,3 +30,17 @@ export function getDb(): Promise<Db> {
 }
 
 export { schema };
+
+/**
+ * Postgres 42P01 (undefined_table). Worth tolerating in the narrow case where a
+ * deploy can run ahead of its migration; anything else is a real fault and must
+ * not be swallowed.
+ */
+export function isUndefinedTable(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: unknown }).code === "42P01"
+  );
+}

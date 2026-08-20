@@ -3,7 +3,7 @@
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getDb, schema } from "@/db";
+import { getDb, isUndefinedTable, schema } from "@/db";
 import {
   alternativesFor,
   compressSession,
@@ -351,9 +351,10 @@ export async function saveExerciseNote(
     }
     return { saved: true };
   } catch (err) {
-    // same hand-applied-migration lag as notesFor: the screen must not crash,
-    // but the caller has to know the note is gone rather than show it as saved
-    console.error("saveExerciseNote: dropped note", err);
+    // same schema-lag window as notesFor: the screen must not crash, but the
+    // caller has to know the note is gone rather than show it as saved
+    if (!isUndefinedTable(err)) throw err;
+    console.error("saveExerciseNote: exercise_notes missing, note dropped");
     return { saved: false };
   }
 }
