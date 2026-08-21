@@ -94,3 +94,24 @@ describe("steps overrides", () => {
     }
   });
 });
+
+describe("cardio steps overrides", () => {
+  it("replaces rollout wording on a running drill", () => {
+    const run = getExercise("3637")!;
+    const text = run.steps.join(" ");
+    // upstream told you to plank with your hands on an ab wheel
+    expect(text).not.toMatch(/plank|rolling the wheel/i);
+    expect(text).toMatch(/knee|cadence/i);
+  });
+
+  it("describes cardio by duration, not repetitions", () => {
+    const run = getExercise("3637")!;
+    // the card logs minutes, so "desired number of repetitions" made no sense
+    expect(run.steps.join(" ")).not.toMatch(/repetitions/i);
+    expect(run.steps.at(-1)).toMatch(/target time/i);
+  });
+
+  it("leaves the genuine wheel rollout rows alone", () => {
+    expect(getExercise("0857")!.steps[0]).toMatch(/kneel/i);
+  });
+});

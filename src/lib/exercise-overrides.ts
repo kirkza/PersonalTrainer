@@ -76,6 +76,19 @@ export const TARGET_OVERRIDES: Readonly<Record<string, string>> = {
  * which movement was intended when the two disagree.
  */
 export const STEPS_OVERRIDES: Readonly<Record<string, string[]>> = {
+  // steps described an ab-wheel rollout — "wheel run" picked up the wording of
+  // the wheel-rollerout rows. Everything else about the row says running: the
+  // image is a knee-drive stride, it is body weight, targets the
+  // cardiovascular system, and lists quads/hamstrings/calves as secondary.
+  // "Wheel" is the sprint-drill cue for cycling the leg through.
+  "3637": [
+    "Stand tall with a slight forward lean and your arms bent at about ninety degrees.",
+    "Drive one knee up towards hip height, then reach the foot forward and pull it back down underneath you.",
+    "As that leg comes through, let the heel cycle up towards your backside — the leg turns over like a wheel.",
+    "Keep the ground contact light and the cadence quick, swinging your arms in opposition to your legs.",
+    "Hold a steady effort for the target time, either on the spot or covering ground.",
+  ],
+
   // image shows a supine slider curl — lying on the back, heels sliding out and
   // back. The original steps described standing on a platform, which is a
   // different exercise and does not load the hamstrings the row targets.
