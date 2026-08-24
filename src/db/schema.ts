@@ -7,6 +7,7 @@ import {
   serial,
   text,
   timestamp,
+  unique,
 } from "drizzle-orm/pg-core";
 import type { PlanExercise } from "@/lib/types";
 
@@ -75,19 +76,34 @@ export const activities = pgTable("activities", {
     .defaultNow(),
 });
 
-export const sets = pgTable("sets", {
-  id: serial("id").primaryKey(),
-  workoutId: integer("workout_id")
-    .notNull()
-    .references(() => workouts.id, { onDelete: "cascade" }),
-  exerciseId: text("exercise_id").notNull(),
-  setNumber: integer("set_number").notNull(),
-  reps: integer("reps").notNull(),
-  weight: real("weight").notNull().default(0),
-  /** cardio sets: duration logged instead of reps×weight */
-  durationMin: integer("duration_min"),
-  loggedAt: timestamp("logged_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const sets = pgTable(
+  "sets",
+  {
+    id: serial("id").primaryKey(),
+    workoutId: integer("workout_id")
+      .notNull()
+      .references(() => workouts.id, { onDelete: "cascade" }),
+    exerciseId: text("exercise_id").notNull(),
+    setNumber: integer("set_number").notNull(),
+    reps: integer("reps").notNull(),
+    weight: real("weight").notNull().default(0),
+    /** cardio sets: duration logged instead of reps×weight */
+    durationMin: integer("duration_min"),
+    loggedAt: timestamp("logged_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    // one row per set of an exercise in a session. A second tap on the log
+    // button before the first insert returns used to add a duplicate, which
+    // only surfaced as an extra finished set after a refresh.
+    unique("sets_workout_exercise_set_number").on(
+      t.workoutId,
+      t.exerciseId,
+      t.setNumber
+    ),
+  ]
+);
 
 /** One living setup note per exercise ("seat height 4, pin 12"), keyed by the
  *  dataset id so it resurfaces whenever that exercise comes around again. */

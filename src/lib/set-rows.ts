@@ -8,9 +8,12 @@
  * silently, since that would orphan a saved set.
  */
 export function canRemoveLastRow(
-  rows: { id: number | null }[],
+  rows: { id: number | null; saving?: boolean }[],
   prescribedSets: number
 ): boolean {
   if (rows.length <= prescribedSets) return false;
-  return rows.at(-1)?.id === null;
+  const last = rows.at(-1);
+  // a row mid-save has no id yet, but its set is on its way to the database
+  if (last?.saving) return false;
+  return last?.id === null;
 }

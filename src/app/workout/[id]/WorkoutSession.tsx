@@ -24,6 +24,8 @@ interface SetRowState {
   id: number | null; // null = not logged yet
   reps: string;
   weight: string;
+  /** save in flight — the button stays down so one tap cannot become two */
+  saving?: boolean;
 }
 
 /** Live session clock — a nudge that time in the gym ≠ work done. */
@@ -202,6 +204,7 @@ function CardioCard({
   const [loggedId, setLoggedId] = useState<number | null>(
     ex.logged[0]?.id ?? null
   );
+  const [saving, setSaving] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
   const [swapping, setSwapping] = useState(false);
   const [, startTransition] = useTransition();
@@ -263,6 +266,8 @@ function CardioCard({
             onClick={() => {
               const m = parseInt(minutes, 10);
               if (!m || m < 1) return;
+              if (saving) return;
+              setSaving(true);
               startTransition(async () => {
                 const { id } = await logSet(
                   workoutId,
@@ -273,9 +278,11 @@ function CardioCard({
                   m
                 );
                 setLoggedId(id);
+                setSaving(false);
               });
             }}
-            className="rounded-lg bg-accent-strong px-3 py-2 text-sm font-bold text-black"
+            disabled={saving}
+            className="rounded-lg bg-accent-strong px-3 py-2 text-sm font-bold text-black disabled:opacity-50"
           >
             ✓
           </button>
@@ -341,13 +348,15 @@ function ExerciseCard({
     const reps = parseInt(row.reps, 10);
     const weight = parseFloat(row.weight) || 0;
     if (!reps || reps < 1) return;
+    if (row.saving) return;
     // inside the tap gesture: unlock audio + (once) ask notification permission
     primeAudio();
     maybeRequestNotifications();
     onSetLogged();
+    update(i, { saving: true });
     startTransition(async () => {
       const { id } = await logSet(workoutId, ex.exerciseId, i + 1, reps, weight);
-      update(i, { id });
+      update(i, { id, saving: false });
     });
   };
 
@@ -436,7 +445,8 @@ function ExerciseCard({
             {row.id === null ? (
               <button
                 onClick={() => log(i)}
-                className="rounded-lg bg-accent-strong px-3 py-2 text-sm font-bold text-black"
+                disabled={row.saving}
+                className="rounded-lg bg-accent-strong px-3 py-2 text-sm font-bold text-black disabled:opacity-50"
               >
                 ✓
               </button>

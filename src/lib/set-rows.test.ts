@@ -39,3 +39,17 @@ describe("canRemoveLastRow", () => {
     expect(canRemoveLastRow([], 0)).toBe(false);
   });
 });
+
+describe("canRemoveLastRow while a save is in flight", () => {
+  it("refuses to drop a row whose set is still being saved", () => {
+    // it has no id yet, but the insert is on its way — dropping the row would
+    // orphan the set that is about to exist
+    expect(
+      canRemoveLastRow([{ id: 1 }, { id: null, saving: true }], 1)
+    ).toBe(false);
+  });
+
+  it("still allows dropping an untouched extra row", () => {
+    expect(canRemoveLastRow([{ id: 1 }, { id: null }], 1)).toBe(true);
+  });
+});

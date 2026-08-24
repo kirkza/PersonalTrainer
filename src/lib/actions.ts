@@ -185,6 +185,9 @@ export async function logSet(
   durationMin?: number
 ) {
   const db = await getDb();
+  // upsert, not insert: a repeat tap on the log button — or a retry after a
+  // flaky connection — has to land on the same row. Inserting a second copy of
+  // the set only showed up later, as an extra finished set after a refresh.
   const [row] = await db
     .insert(schema.sets)
     .values({
@@ -194,6 +197,19 @@ export async function logSet(
       reps,
       weight,
       durationMin: durationMin ?? null,
+    })
+    .onConflictDoUpdate({
+      target: [
+        schema.sets.workoutId,
+        schema.sets.exerciseId,
+        schema.sets.setNumber,
+      ],
+      set: {
+        reps,
+        weight,
+        durationMin: durationMin ?? null,
+        loggedAt: new Date(),
+      },
     })
     .returning();
   return { id: row.id };
