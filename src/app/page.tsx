@@ -9,12 +9,21 @@ import {
   getNextSession,
   getProfile,
   getWorkouts,
+  type ClosedSession,
 } from "@/lib/data";
 import { getExercise } from "@/lib/exercises";
 import ActivityCard from "./ActivityCard";
 import TodayActions, { type SwapDay } from "./TodayActions";
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** " (47 min, 12 sets)" — whichever of the two is actually known. */
+function closedDetail(c: ClosedSession): string {
+  const parts: string[] = [];
+  if (c.durationMin !== null) parts.push(`${c.durationMin} min`);
+  if (c.liftingSets > 0) parts.push(`${c.liftingSets} sets`);
+  return parts.length > 0 ? ` (${parts.join(", ")})` : "";
+}
 
 export default async function TodayPage() {
   const profile = await getProfile();
@@ -69,6 +78,26 @@ export default async function TodayPage() {
           {doneThisWeek}/{profile.daysPerWeek} sessions this week
         </h1>
       </header>
+
+      {next.autoClosed.map((c, i) => (
+        <p
+          key={i}
+          className="rounded-xl border border-border-subtle bg-surface-2 px-3 py-2 text-xs text-muted"
+        >
+          {c.discarded ? (
+            <>
+              Cleared an empty <span className="font-medium">{c.focus}</span>{" "}
+              session you never logged into.
+            </>
+          ) : (
+            <>
+              Closed your <span className="font-medium">{c.focus}</span> session
+              — you left it open, so it was finished at your last set
+              {closedDetail(c)}.
+            </>
+          )}
+        </p>
+      ))}
 
       {next.inProgress ? (
         <Link

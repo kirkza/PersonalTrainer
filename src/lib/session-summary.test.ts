@@ -17,6 +17,7 @@ const lift = (
   reps,
   weight,
   durationMin: null,
+  loggedAt: at("2026-09-01T18:00:00Z"),
 });
 
 const cardio = (exerciseId: string, durationMin: number): SetRow => ({
@@ -27,6 +28,7 @@ const cardio = (exerciseId: string, durationMin: number): SetRow => ({
   reps: 1,
   weight: 0,
   durationMin,
+  loggedAt: at("2026-09-01T18:00:00Z"),
 });
 
 const session = (

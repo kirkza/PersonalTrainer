@@ -1,7 +1,9 @@
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb, isUndefinedTable, schema } from "@/db";
 import { getExercise, gifUrl, imageUrl } from "./exercises";
 import { chooseNextPosition, type SessionHistoryEntry } from "./adapt";
+import { sessionDurationMin } from "./session-summary";
+import { staleSessionAction } from "./stale-session";
 import type { PlanExercise, Profile, SkipDecision, WorkoutStatus } from "./types";
 
 export async function getProfile(): Promise<(Profile & { id: number }) | null> {
@@ -126,15 +128,98 @@ export async function planDayFocusById(): Promise<Map<number, string>> {
   return new Map(rows.map((r) => [r.id, r.focus]));
 }
 
+export interface ClosedSession {
+  focus: string;
+  durationMin: number | null;
+  liftingSets: number;
+  discarded: boolean;
+}
+
+/**
+ * Close out sessions left `in_progress` from an earlier visit. Until this ran,
+ * a forgotten "Finish workout" captured the next visit — the home card and
+ * `startWorkout` both resume an in-progress session — and stalled the rotation,
+ * which skips sessions still in progress.
+ *
+ * Returns what it closed so the caller can say so. Writes are guarded on the
+ * status, so two concurrent renders cannot both close the same session.
+ */
+async function closeStaleSessions(
+  workouts: WorkoutRow[],
+  focusById: Map<number, string>
+): Promise<ClosedSession[]> {
+  const open = workouts.filter((w) => w.status === "in_progress");
+  if (open.length === 0) return [];
+
+  const db = await getDb();
+  const now = new Date();
+  const closed: ClosedSession[] = [];
+
+  for (const w of open) {
+    const sets = await getSetsForWorkout(w.id);
+    const lastSetAt = sets.reduce<Date | null>(
+      (latest, s) =>
+        !latest || s.loggedAt > latest ? s.loggedAt : latest,
+      null
+    );
+    const decision = staleSessionAction(w.startedAt, lastSetAt, now);
+    if (decision.action === "keep") continue;
+
+    const focus =
+      (w.planDayId !== null ? focusById.get(w.planDayId) : undefined) ??
+      "Workout";
+
+    if (decision.action === "discard") {
+      await db
+        .delete(schema.workouts)
+        .where(
+          and(
+            eq(schema.workouts.id, w.id),
+            eq(schema.workouts.status, "in_progress")
+          )
+        );
+      closed.push({ focus, durationMin: null, liftingSets: 0, discarded: true });
+      continue;
+    }
+
+    await db
+      .update(schema.workouts)
+      .set({ status: "completed", finishedAt: decision.finishedAt })
+      .where(
+        and(
+          eq(schema.workouts.id, w.id),
+          eq(schema.workouts.status, "in_progress")
+        )
+      );
+    w.status = "completed";
+    w.finishedAt = decision.finishedAt;
+    closed.push({
+      focus,
+      durationMin: sessionDurationMin(w.startedAt, decision.finishedAt),
+      liftingSets: sets.filter((s) => s.durationMin === null).length,
+      discarded: false,
+    });
+  }
+  return closed;
+}
+
 /** The plan day the user should do next, honoring shift-skips and recovery. */
 export async function getNextSession(): Promise<{
   planDay: PlanDayRow;
   pendingFold: WorkoutRow | null;
   inProgress: WorkoutRow | null;
+  autoClosed: ClosedSession[];
 } | null> {
   const days = await getActivePlanDays();
   if (days.length === 0) return null;
-  const workouts = await getWorkouts();
+  const allWorkouts = await getWorkouts();
+  const focusById = await planDayFocusById();
+
+  const autoClosed = await closeStaleSessions(allWorkouts, focusById);
+  // a discarded session is gone; re-read rather than reason about the gap
+  const workouts = autoClosed.some((c) => c.discarded)
+    ? await getWorkouts()
+    : allWorkouts;
 
   const inProgress =
     workouts.filter((w) => w.status === "in_progress").at(-1) ?? null;
@@ -165,7 +250,7 @@ export async function getNextSession(): Promise<{
       )
       .at(-1) ?? null;
 
-  return { planDay, pendingFold, inProgress };
+  return { planDay, pendingFold, inProgress, autoClosed };
 }
 
 export interface SetRow {
@@ -176,6 +261,7 @@ export interface SetRow {
   reps: number;
   weight: number;
   durationMin: number | null;
+  loggedAt: Date;
 }
 
 export async function getSetsForWorkout(workoutId: number): Promise<SetRow[]> {
